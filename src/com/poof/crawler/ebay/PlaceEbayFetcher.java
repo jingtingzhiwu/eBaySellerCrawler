@@ -51,6 +51,6 @@ public class PlaceEbayFetcher {
 				log.error(log.getName() + " : program error: " + e);
 			}
 		}
-		return new ArrayList<ProxyHost>();
+		return null;
 	}
 }

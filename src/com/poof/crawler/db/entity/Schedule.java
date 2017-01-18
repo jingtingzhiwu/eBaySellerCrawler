@@ -6,7 +6,7 @@ public class Schedule {
 	private String cronexp;
 	private String type;
 	private String site;
-	private String searchTerm;
+	private String search_term;
 	private int status;
 
 	public String getId() {
@@ -41,14 +41,6 @@ public class Schedule {
 		this.type = type;
 	}
 
-	public String getSearchTerm() {
-		return searchTerm;
-	}
-
-	public void setSearchTerm(String searchTerm) {
-		this.searchTerm = searchTerm;
-	}
-
 	public int getStatus() {
 		return status;
 	}
@@ -63,5 +55,13 @@ public class Schedule {
 
 	public void setSite(String site) {
 		this.site = site;
+	}
+
+	public String getSearchTerm() {
+		return search_term;
+	}
+
+	public void setSearchTerm(String searchTerm) {
+		this.search_term = searchTerm;
 	}
 }

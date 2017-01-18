@@ -4,6 +4,7 @@ import java.net.SocketException;
 import java.util.Map;
 import java.util.Random;
 
+import org.jsoup.Connection;
 import org.jsoup.Connection.Response;
 import org.jsoup.HttpStatusException;
 import org.jsoup.Jsoup;
@@ -36,7 +37,12 @@ public abstract class Parser {
 	protected Document parseURL(final String url, ProxyHost proxy, Map<String, String> cookies) throws Exception {
 		Document doc = null;
 		try {
-			Response response = Jsoup.connect(url)
+			Connection conn = null;
+			if (proxy == null)
+				conn = Jsoup.connect(url);
+			else
+				conn = Jsoup.connect(url);
+			Response response = conn
 //					.cookies(cookies)
 					.header("User-Agent", agents[new Random().nextInt(agents.length)])
 					.header("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8")
@@ -48,8 +54,12 @@ public abstract class Parser {
 			doc = response.parse();
 		} catch (Exception e) {
 			try {
-				Response response = Jsoup.connect(url)
-						.proxy(proxy.getIp(), proxy.getPort())
+				Connection conn = null;
+				if (proxy == null)
+					conn = Jsoup.connect(url);
+				else
+					conn = Jsoup.connect(url).proxy(proxy.getIp(), proxy.getPort());
+				Response response = conn
 //						.cookies(cookies)
 						.header("User-Agent", agents[new Random().nextInt(agents.length)])
 						.header("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8")

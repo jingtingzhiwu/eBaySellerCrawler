@@ -196,6 +196,7 @@ public class DynamicTask {
 					jobDetail.setTargetObject(SellerIDPool.getInstance());
 					jobDetail.setArguments(new Object[] { new PlaceEbayBySellerIdFetcher(list.get(i)) });
 				}
+				jobDetail.afterPropertiesSet();
 
 				trigger = new CronTrigger(list.get(i).getName() + list.get(i).getId(), Scheduler.DEFAULT_GROUP, list.get(i).getCronexp());
 				schedulerFactory.scheduleJob((JobDetail) jobDetail.getObject(), trigger);
@@ -211,6 +212,7 @@ public class DynamicTask {
 					log.info("invaild schedule name: [" + (list.get(i).getName() + list.get(i).getId()) + "] deleted...");
 				}
 			}
+			schedulerFactory.triggerJob(list.get(i).getName() + list.get(i).getId(), Scheduler.DEFAULT_GROUP);
 			if (trigger != null)
 				this.startOrStop(trigger.getName(), start);
 		}

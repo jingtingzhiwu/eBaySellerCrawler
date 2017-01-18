@@ -30,10 +30,11 @@ public class PlaceEbayByKeyWordFetcher  extends PlaceEbayFetcher implements Runn
 
 		log.info("starting [PlaceEbayByKeyWord] thread name: [" + schedule.getName() + "], site: [" + schedule.getSite() + "], searchterm: [" + schedule.getSearchTerm() + "]");
 		List<ProxyHost> proxies = getProxyHost();
+		if(proxies != null)
 		Collections.shuffle(proxies);
 
 		try {
-			KeyWordListPool.getInstance().execute(new ListingParser(schedule, String.format(PRE_URL, schedule.getSite(), URLEncoder.encode(String.format(ITEMID_LIST_URL, schedule.getSite(), schedule.getSearchTerm(), 1, 0), "UTF-8")) + END_URL, proxies.get(0)));
+			KeyWordListPool.getInstance().execute(new ListingParser(schedule, String.format(PRE_URL, schedule.getSite(), URLEncoder.encode(String.format(ITEMID_LIST_URL, schedule.getSite(), schedule.getSearchTerm(), 1, 0), "UTF-8")) + END_URL, proxies != null && proxies.size() > 0 ? proxies .get(0) : null));
 			proxies.remove(0);
 		} catch (Exception e) {
 			e.printStackTrace();

@@ -5,9 +5,10 @@ import java.sql.PreparedStatement;
 import java.sql.SQLException;
 import java.sql.Types;
 import java.util.LinkedList;
-import java.util.List;
 import java.util.Random;
 import java.util.concurrent.TimeUnit;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import org.apache.commons.lang3.StringUtils;
 import org.jsoup.nodes.Document;
@@ -23,19 +24,19 @@ import com.poof.crawler.utils.pool.OfferPool;
 
 public class ListingParser extends Parser implements Runnable {
 	private static final String IMG_SELECTOR = "img.img";
-	private static final String TITLE_SELECTOR = "[class*=lvtitle] > a";
-	private static final String SELLERID_SELECTOR = "[class*=lvdetails] > li:contains(Seller)";
+	private static final String TITLE_SELECTOR = "[class*=lvtitle] a";
+	private static final String SELLERID_SELECTOR = "[class*=lvdetails] li:contains(Seller)";
 	private static final String SHIPPING_SELECTOR = "[class*=lvshipping]";
 	private static final String BUYTYPE_SELECTOR = "[class*=lvformat]";
 	private static final String FEEDBACKRATE_SELECTOR = "span.selrat";
-	private static final String RANGEPRICE__SELECTOR = "[class*=lvprice] > [class=prRange]";
-	private static final String SALEPRICE__SELECTOR = "[class*=lvprice] > [class=bold]";
-	private static final String ORGIPRICE_SELECTOR = "[class*=lvprice] > [class=stk-thr]";
+	private static final String RANGEPRICE__SELECTOR = "[class*=lvprice] [class=prRange]";
+	private static final String SALEPRICE__SELECTOR = "[class*=lvprice] [class=bold]";
+	private static final String ORGIPRICE_SELECTOR = "[class*=lvprice] [class=stk-thr]";
 	private static final String RATINGS_SELECTOR = "span.selrat";
 	private static final String SOLD_SELECTOR = "[class*=hotness-signal]";
-	private static final String FROMADDR_SELECTOR = "[class*=lvdetails] > li:contains(From)";
-	private static final String LISTITEM_SELECTOR = "#ListViewInner > li[id*=item]";
-	private static final String NEXT_PAGE_SELECTOR = "#Pagination > .pages > a.curr";
+	private static final String FROMADDR_SELECTOR = "[class*=lvdetails] li:contains(From)";
+	private static final String LISTITEM_SELECTOR = "#ListViewInner li[id*=item]";
+	private static final String NEXT_PAGE_SELECTOR = "#Pagination .pages a.curr";
 	private static final Logger log = LoggerFactory.getLogger(ListingParser.class);
 
 	private Document doc;
@@ -227,7 +228,14 @@ public class ListingParser extends Parser implements Runnable {
 			} else {
 				Elements salePrice = element.select(SALEPRICE__SELECTOR);
 				if (salePrice.size() > 0) {
-					String tmp = salePrice.last().text().replaceAll(salePrice.last().children().text(), "").replaceAll("[^\\d.]", "");
+					String tmp = salePrice.last().text();
+					/*if (tmp.indexOf(salePrice.last().children().text()) > -1)
+						tmp = tmp.substring(0, tmp.indexOf(salePrice.last().children().text()));
+					tmp = tmp.replaceAll("[^\\d.]", "");*/
+					Pattern pattern = Pattern.compile("(\\d+(\\.\\d+)?)");
+					Matcher matcher = pattern.matcher(tmp);
+					if (matcher.find())
+						tmp = matcher.group(1);
 					if (StringUtils.isNotBlank(tmp)) {
 						this.beginPrice.add(Double.valueOf(tmp));
 						this.endPrice.add(null);

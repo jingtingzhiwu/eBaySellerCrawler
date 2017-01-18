@@ -11,6 +11,11 @@ import com.poof.crawler.db.entity.Schedule;
 import com.poof.crawler.utils.dom.ListingParser;
 import com.poof.crawler.utils.pool.SellerIDListPool;
 
+/**
+ * @author wilkey 
+ * @mail admin@wilkey.vip
+ * @Date 2017年1月18日 上午10:46:51
+ */
 public class PlaceEbayBySellerIdFetcher  extends PlaceEbayFetcher implements Runnable{
 	private static Logger log = Logger.getLogger(PlaceEbayBySellerIdFetcher.class);
 
@@ -25,10 +30,11 @@ public class PlaceEbayBySellerIdFetcher  extends PlaceEbayFetcher implements Run
 
 		log.info("starting [PlaceEbayBySellerId] thread name: [" + schedule.getName() + "], site: [" + schedule.getSite() + "], searchterm: [" + schedule.getSearchTerm() + "]");
 		List<ProxyHost> proxies = getProxyHost();
+		if(proxies != null)
 		Collections.shuffle(proxies);
 
 		try {
-			SellerIDListPool.getInstance().execute(new ListingParser(schedule, String.format(PRE_URL, schedule.getSite(), URLEncoder.encode(String.format(SELLERID_LIST_URL, schedule.getSite(), schedule.getSearchTerm(), 1), "UTF-8")) + END_URL, proxies.get(0)));
+			SellerIDListPool.getInstance().execute(new ListingParser(schedule, String.format(PRE_URL, schedule.getSite(), URLEncoder.encode(String.format(SELLERID_LIST_URL, schedule.getSite(), schedule.getSearchTerm(), 1), "UTF-8")) + END_URL, proxies != null && proxies.size() > 0 ? proxies .get(0) : null));
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
