@@ -9,14 +9,12 @@ import com.poof.crawler.utils.pool.ThreadPoolMirror;
 
 public class test {
 	public static void main(String[] args) throws UnsupportedEncodingException, InterruptedException {
-		String test1 = "515.46 Trending at RMB 755.94";
+		/*String test1 = "515.46 Trending at RMB 755.94";
 
-		   Pattern pattern = Pattern.compile("(\\d+(\\.\\d+)?)");  
-		   Matcher matcher = pattern.matcher(test1);  
-		  System.err.println(matcher.find());
-		System.err.println(matcher.group(1));
-		
-		if(1==1)return;
+		Pattern pattern = Pattern.compile("(\\d+(\\.\\d+)?)");
+		Matcher matcher = pattern.matcher(test1);
+		System.err.println(matcher.find());
+		System.err.println(matcher.group(1));*/
 		for (int i = 0; i < 5; i++) {
 			final int c = i;
 			KeyWordListPool.getInstance().execute(new Runnable() {
@@ -33,11 +31,11 @@ public class test {
 				}
 			});
 		}
-		System.err.println("ok?");
-		while(KeyWordListPool.getInstance().getCompletedTaskCount() != 5){
-			System.err.println(KeyWordListPool.getInstance().getCompletedTaskCount());
-			Thread.sleep(1000);
+		while (true) {
+			if (KeyWordListPool.getInstance().getActiveCount() == 0) {
+				Thread.sleep(1000);
+				System.err.println(ThreadPoolMirror.dumpThreadPool("爬虫线程池", KeyWordListPool.getInstance()));
+			}
 		}
-		System.err.println(ThreadPoolMirror.dumpThreadPool("爬虫线程池", KeyWordListPool.getInstance()));
 	}
 }

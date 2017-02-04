@@ -38,7 +38,7 @@ public class PlaceEbayFetcher {
 
 	protected List<ProxyHost> getProxyHost() {
 		try {
-			List<ProxyHost> list = DBUtil.queryBeanList(DBUtil.openConnection(), "select * from t_porxy_host", ProxyHost.class);
+			List<ProxyHost> list = DBUtil.queryBeanList(DBUtil.openConnection(), "select * from t_proxy_host", ProxyHost.class);
 			return list;
 		} catch (Exception e) {
 			e.printStackTrace();

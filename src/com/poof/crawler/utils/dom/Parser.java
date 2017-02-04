@@ -41,7 +41,7 @@ public abstract class Parser {
 			if (proxy == null)
 				conn = Jsoup.connect(url);
 			else
-				conn = Jsoup.connect(url);
+				conn = Jsoup.connect(url).proxy(proxy.getIp(), proxy.getPort());
 			Response response = conn
 //					.cookies(cookies)
 					.header("User-Agent", agents[new Random().nextInt(agents.length)])

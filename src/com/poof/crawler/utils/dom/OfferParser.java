@@ -51,6 +51,7 @@ public class OfferParser extends Parser implements Runnable {
 	 */
 	@Override
 	public void run() {
+		if(doc == null ) return;
 		Elements refer = doc.select(REFER_SELECTOR);
 		if (refer.size() == 0)
 			return;
@@ -154,7 +155,8 @@ public class OfferParser extends Parser implements Runnable {
 
 	void update() {
 		try {
-			DBUtil.execute(DBUtil.openConnection(), "update t_listing set sold = " + this.sold + " where item_id=" + this.itemId);
+			DBUtil.execute(DBUtil.openConnection(), "update t_listing set sold = " + this.sold + " where item_id=" + this.itemId
+					+ " and  id in (select id  from (select max(id) as id from t_listing where item_id=" + this.itemId + " ) tmp )");
 			// + " and site = '" + this.itemId + "'"
 		} catch (Exception e) {
 			e.printStackTrace();

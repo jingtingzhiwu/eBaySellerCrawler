@@ -92,8 +92,9 @@ public class ListingParser extends Parser implements Runnable {
 				parseSold(element);
 				parseFromAddr(element);
 			}
-	
-			log.info("crossing [PlaceEbayByKeyWord] thread name: [" + schedule.getName() + "], site: [" + schedule.getSite() + "], searchterm: [" + schedule.getSearchTerm() + "], parse List ["+url+"] done. waiting [OfferParser] Thread going on");
+
+			log.info("crossing [" + ("1".equals(schedule.getType()) ? "PlaceEbayByKeyWord" : ("2".equals(schedule.getType()) ? "PlaceEbayBySellerId" : "Other")) + "] "
+					+ "thread name: [" + schedule.getName() + "], site: [" + schedule.getSite() + "], searchterm: [" + schedule.getSearchTerm() + "], parse List ["+url+"] done. waiting [OfferParser] Thread going on");
 			try {
 				TimeUnit.SECONDS.sleep(new Random().nextInt(20));
 			} catch (InterruptedException e) {
@@ -107,17 +108,23 @@ public class ListingParser extends Parser implements Runnable {
 			for (int i = 0; i < itemId.size(); i++) {
 				OfferPool.getInstance().execute(new OfferParser(String.format(OFFER_DETAIL_URL, schedule.getSite(), itemId.get(i)), this.proxy, itemId.get(i)));
 			}
-	
-			//permission denied: connect
-			url = parseNextPage(doc);
-			if (StringUtils.isBlank(url)) {
+
+			//3. Keyword只抓第一页200条
+			if("1".equals(schedule.getType()))
 				break;
-			}
-			try {
-				this.doc = parseURL(url, proxy, null);
-			} catch (Exception e) {
-				e.printStackTrace();
-				log.error("parse listing url [" + url + "] error, abort", e);
+	
+			//4. 如果是根据SellerID则分页继续
+			if("2".equals(schedule.getType())){
+				url = parseNextPage(doc);
+				if (StringUtils.isBlank(url)) {
+					break;
+				}
+				try {
+					this.doc = parseURL(url, proxy, null);
+				} catch (Exception e) {
+					e.printStackTrace();
+					log.error("parse listing url [" + url + "] error, abort", e);
+				}
 			}
 		}
 		log.info("finished [PlaceEbayByKeyWord] thread name: [" + schedule.getName() + "], site: [" + schedule.getSite() + "], searchterm: [" + schedule.getSearchTerm() + "], parse List done. waiting [OfferParser] Thread going on");
@@ -135,7 +142,7 @@ public class ListingParser extends Parser implements Runnable {
 				throw new IllegalAccessException();
 			this.img.add(img.attr("src"));
 		} catch (Exception e) {
-			log.error("itemId: [" + tmpId + "] error, cannot get [img]", e);
+			log.error("itemId: [" + tmpId + "] error, cannot get [img]" + "\n" + element.html(), e);
 			this.img.add(null);
 		}
 	}
@@ -147,7 +154,7 @@ public class ListingParser extends Parser implements Runnable {
 				throw new IllegalAccessException();
 			this.title.add(title.text());
 		} catch (Exception e) {
-			log.error("itemId: [" + tmpId + "] error, cannot get [title]", e);
+			log.error("itemId: [" + tmpId + "] error, cannot get [title]" + "\n" + element.html(), e);
 			this.title.add(null);
 		}
 	}
@@ -159,7 +166,7 @@ public class ListingParser extends Parser implements Runnable {
 				throw new IllegalAccessException();
 			this.sellerId.add(sellerId.text().substring(sellerId.text().indexOf(": ") + 2, sellerId.text().indexOf("(")));
 		} catch (Exception e) {
-			log.error("itemId: [" + tmpId + "] error, cannot get [sellerId]", e);
+			log.error("itemId: [" + tmpId + "] error, cannot get [sellerId]" + "\n" + element.html(), e);
 			this.sellerId.add(null);
 		}
 	}
@@ -171,7 +178,7 @@ public class ListingParser extends Parser implements Runnable {
 				throw new IllegalAccessException();
 			this.shipping.add(shipping.text());
 		} catch (Exception e) {
-			log.error("itemId: [" + tmpId + "] error, cannot get [shipping]", e);
+			log.error("itemId: [" + tmpId + "] error, cannot get [shipping]" + "\n" + element.html(), e);
 			this.shipping.add(null);
 		}
 	}
@@ -183,7 +190,7 @@ public class ListingParser extends Parser implements Runnable {
 				throw new IllegalAccessException();
 			this.buyType.add(buyType.last().text());
 		} catch (Exception e) {
-			log.error("itemId: [" + tmpId + "] error, cannot get [buyType]", e);
+			log.error("itemId: [" + tmpId + "] error, cannot get [buyType]" + "\n" + element.html(), e);
 			this.buyType.add(null);
 		}
 	}
@@ -199,7 +206,7 @@ public class ListingParser extends Parser implements Runnable {
 			else
 				this.feedbackRate.add(null);
 		} catch (Exception e) {
-			log.error("itemId: [" + tmpId + "] error, cannot get [feedbackRate]", e);
+			log.error("itemId: [" + tmpId + "] error, cannot get [feedbackRate]" + "\n" + element.html(), e);
 			this.feedbackRate.add(null);
 		}
 	}
@@ -274,7 +281,7 @@ public class ListingParser extends Parser implements Runnable {
 			// "0" : e.text().replaceAll("[$,£,EUR,CDN$,?]", "");
 			// //$美国，澳大利亚，//EUR,法国，德国，£,英国，CDN$,加拿大
 		} catch (Exception e) {
-			log.error("itemId: [" + tmpId + "] error, cannot get [price]", e);
+			log.error("itemId: [" + tmpId + "] error, cannot get [price]" + "\n" + element.html(), e);
 			this.beginPrice.add(null);
 			this.endPrice.add(null);
 			this.orgiPrice.add(null);
@@ -292,7 +299,7 @@ public class ListingParser extends Parser implements Runnable {
 			else
 				this.ratings.add(0);
 		} catch (Exception e) {
-			log.error("itemId: [" + tmpId + "] error, cannot get [ratings]", e);
+			log.error("itemId: [" + tmpId + "] error, cannot get [ratings]" + "\n" + element.html(), e);
 			this.ratings.add(0);
 		}
 	}
@@ -302,8 +309,8 @@ public class ListingParser extends Parser implements Runnable {
 			Elements sold = element.select(SOLD_SELECTOR);
 			if (sold.size() == 0)
 				throw new IllegalAccessException();
-			if (StringUtils.isNotBlank(sold.text()) && sold.text().contains("sold")) {
-				String tmp = sold.text().replaceAll("[^\\d.]", "");
+			if (StringUtils.isNotBlank(sold.first().text()) && sold.first().text().contains("sold")) {
+				String tmp = sold.first().text().replaceAll("[^\\d.]", "");
 				if (StringUtils.isNotBlank(tmp))
 					this.sold.add(Integer.valueOf(tmp));
 				else
@@ -316,6 +323,10 @@ public class ListingParser extends Parser implements Runnable {
 		}
 	}
 
+	/**
+	 * vpn有可能取不到，因此可空
+	 * @param element
+	 */
 	private void parseFromAddr(Element element) {
 		try {
 			Elements fromAddr = element.select(FROMADDR_SELECTOR);
@@ -330,7 +341,7 @@ public class ListingParser extends Parser implements Runnable {
 				this.fromAddr.add(null);
 			}
 		} catch (Exception e) {
-			log.error("itemId: [" + tmpId + "] error, cannot get [fromAddr]", e);
+			log.error("itemId: [" + tmpId + "] error, cannot get [fromAddr]" + "\n" + element.html(), e);
 			this.fromAddr.add(null);
 		}
 	}
@@ -350,7 +361,7 @@ public class ListingParser extends Parser implements Runnable {
 
 	// save to db
 	void insert() {
-		String sql = "insert into t_listing (schedule_id, item_id, title, seller_id, shipping, buy_type, from_addr, feedback_rate, begin_price, end_price, org_price, ratings, sold) values (?,?,?,?,?,?,?,?,?,?,?,?,?);";
+		String sql = "insert into t_listing (schedule_id, site, item_id, title, seller_id, shipping, buy_type, from_addr, feedback_rate, begin_price, end_price, org_price, ratings, sold) values (?,?,?,?,?,?,?,?,?,?,?,?,?,?);";
 		Connection conn = null;
 		try {
 			conn = DBUtil.openConnection();
@@ -363,41 +374,42 @@ public class ListingParser extends Parser implements Runnable {
 				for (int j = 0; j < (i == size - 1 ? itemId.size() % 100 : 100); j++) {
 					int _index = i * 100 + j;
 					pstmt.setString(1, this.schedule.getId());
-					pstmt.setString(2, this.itemId.get(_index));
-					pstmt.setString(3, this.title.get(_index));
-					pstmt.setString(4, this.sellerId.get(_index));
-					pstmt.setString(5, this.shipping.get(_index));
-					pstmt.setString(6, this.buyType.get(_index));
-					pstmt.setString(7, this.fromAddr.get(_index));
+					pstmt.setString(2, this.schedule.getSite());
+					pstmt.setString(3, this.itemId.get(_index));
+					pstmt.setString(4, this.title.get(_index));
+					pstmt.setString(5, this.sellerId.get(_index));
+					pstmt.setString(6, this.shipping.get(_index));
+					pstmt.setString(7, this.buyType.get(_index));
+					pstmt.setString(8, this.fromAddr.get(_index));
 					if (this.feedbackRate.get(_index) == null)
-						pstmt.setNull(8, Types.DOUBLE);
-					else
-						pstmt.setDouble(8, this.feedbackRate.get(_index));
-
-					if (this.beginPrice.get(_index) == null)
 						pstmt.setNull(9, Types.DOUBLE);
 					else
-						pstmt.setDouble(9, this.beginPrice.get(_index));
+						pstmt.setDouble(9, this.feedbackRate.get(_index));
 
-					if (this.endPrice.get(_index) == null)
+					if (this.beginPrice.get(_index) == null)
 						pstmt.setNull(10, Types.DOUBLE);
 					else
-						pstmt.setDouble(10, this.endPrice.get(_index));
+						pstmt.setDouble(10, this.beginPrice.get(_index));
 
-					if (this.orgiPrice.get(_index) == null)
+					if (this.endPrice.get(_index) == null)
 						pstmt.setNull(11, Types.DOUBLE);
 					else
-						pstmt.setDouble(11, this.orgiPrice.get(_index));
+						pstmt.setDouble(11, this.endPrice.get(_index));
+
+					if (this.orgiPrice.get(_index) == null)
+						pstmt.setNull(12, Types.DOUBLE);
+					else
+						pstmt.setDouble(12, this.orgiPrice.get(_index));
 
 					if (this.ratings.get(_index) == null)
-						pstmt.setNull(12, Types.INTEGER);
-					else
-						pstmt.setInt(12, this.ratings.get(_index));
-
-					if (this.sold.get(_index) == null)
 						pstmt.setNull(13, Types.INTEGER);
 					else
-						pstmt.setInt(13, this.sold.get(_index));
+						pstmt.setInt(13, this.ratings.get(_index));
+
+					if (this.sold.get(_index) == null)
+						pstmt.setNull(14, Types.INTEGER);
+					else
+						pstmt.setInt(14, this.sold.get(_index));
 					pstmt.addBatch();
 				}
 				pstmt.executeBatch();

@@ -40,6 +40,7 @@ public class App {
 		context.start();
 		App app = new App();
 		app.DynamicTask();
+		System.err.println("starting......");
 		System.in.read();
 	}
 
