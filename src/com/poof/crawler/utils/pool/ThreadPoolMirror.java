@@ -175,7 +175,7 @@ public abstract class ThreadPoolMirror {
 		StringBuffer sb = new StringBuffer();
 		for (Iterator iterator = map.entrySet().iterator(); iterator.hasNext();) {
 			entry = (java.util.Map.Entry) iterator.next();
-			sb.append(entry.getKey().toString()).append("'").append(null == entry.getValue() ? "" : entry.getValue().toString()).append(iterator.hasNext() ? "^" : "");
+			sb.append(entry.getKey().toString()).append("=").append(null == entry.getValue() ? "" : entry.getValue().toString()).append(iterator.hasNext() ? ", " : "");
 		}
 		return sb.toString();
 	}

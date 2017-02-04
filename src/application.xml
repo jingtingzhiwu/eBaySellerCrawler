@@ -17,8 +17,8 @@
 	<context:annotation-config />
 	<context:component-scan base-package="com.poof.crawler" />
 	<!-- 
-	 <bean class="org.springframework.beans.factory.annotation.AutowiredAnnotationBeanPostProcessor" />   
-	 -->
-	<bean id="schedulerFactory" class="org.springframework.scheduling.quartz.SchedulerFactoryBean" />
+	<bean class="org.springframework.beans.factory.annotation.AutowiredAnnotationBeanPostProcessor" />   
+	-->
+	<bean id="scheduler" class="org.springframework.scheduling.quartz.SchedulerFactoryBean" />
 
 </beans>

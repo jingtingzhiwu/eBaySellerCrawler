@@ -5,6 +5,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import org.apache.log4j.Logger;
+import org.quartz.Scheduler;
 import org.springframework.context.support.ClassPathXmlApplicationContext;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
@@ -13,8 +14,8 @@ import com.poof.crawler.db.DBUtil;
 import com.poof.crawler.db.entity.Schedule;
 
 /**
- * @author wilkey 
- * @desc	每日0点更新schedule, 动态刷新
+ * @author wilkey
+ * @desc 每日0点更新schedule, 动态刷新
  * @mail admin@wilkey.vip
  * @Date 2017年1月18日 上午10:47:33
  */
@@ -22,6 +23,7 @@ import com.poof.crawler.db.entity.Schedule;
 public class App {
 
 	private static Logger log = Logger.getLogger(App.class);
+	private static Scheduler schedulerFactory;
 
 	@Scheduled(cron = "0 0 0 * * *")
 	public void DynamicTask() throws Exception {
@@ -30,13 +32,14 @@ public class App {
 			log.info("starting DynamicTask to crawl eBay, no schedule and return");
 			return;
 		}
-		DynamicTask dynamicTask = new DynamicTask();
+		DynamicTask dynamicTask = new DynamicTask(schedulerFactory);
 
 		dynamicTask.dynamicExec(list, true);
 	}
 
 	public static void main(String[] args) throws Exception {
 		ClassPathXmlApplicationContext context = new ClassPathXmlApplicationContext("application.xml");
+		schedulerFactory = (Scheduler) context.getBean("scheduler");
 		context.start();
 		App app = new App();
 		app.DynamicTask();
@@ -49,7 +52,7 @@ public class App {
 			List<Schedule> result = new ArrayList<Schedule>();
 			List<Schedule> vaild = DBUtil.queryBeanList(DBUtil.openConnection(), "select * from t_schedule where status = 1 order by type ", Schedule.class);
 			List<Schedule> invaild = DBUtil.queryBeanList(DBUtil.openConnection(), "select * from t_schedule where status = 0 ", Schedule.class);
-			log.info("starting DynamicTask to crawl eBay, activity schedule: [" + (vaild != null ? vaild.size() : 0) + "], deleted schedule: [" + (invaild != null ? invaild.size() : 0) + "]");
+			log.info("refreshing DynamicTask to crawl eBay, activity schedule: [" + (vaild != null ? vaild.size() : 0) + "], deleted schedule: [" + (invaild != null ? invaild.size() : 0) + "]");
 			if (!vaild.isEmpty())
 				result.addAll(vaild);
 			if (!invaild.isEmpty())
@@ -64,6 +67,6 @@ public class App {
 				e.printStackTrace();
 			}
 		}
-		return null;
+		return new ArrayList<Schedule>();
 	}
 }

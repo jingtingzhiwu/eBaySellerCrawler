@@ -4,8 +4,6 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.Types;
 import java.util.ArrayList;
-import java.util.Random;
-import java.util.concurrent.TimeUnit;
 
 import org.apache.commons.lang3.StringUtils;
 import org.jsoup.nodes.Document;
@@ -16,10 +14,13 @@ import org.slf4j.LoggerFactory;
 
 import com.poof.crawler.db.DBUtil;
 import com.poof.crawler.db.entity.ProxyHost;
+import com.poof.crawler.utils.pool.OfferPool;
+import com.poof.crawler.utils.pool.ThreadPoolMirror;
 
 public class OfferParser extends Parser implements Runnable {
 	private static final Logger log = LoggerFactory.getLogger(OfferParser.class);
 	private static final String REFER_SELECTOR = "[class=statusMessage]";
+	private static final String SOLD_SELECTOR = "td:contains(shows the last 100 transactions)";
 
 	private Document doc;
 	private String itemId;
@@ -32,7 +33,8 @@ public class OfferParser extends Parser implements Runnable {
 	public OfferParser(String url, ProxyHost proxy, String itemId) {
 		try {
 			this.doc = parseURL(url, proxy, null);
-			TimeUnit.SECONDS.sleep(new Random().nextInt(20));
+			if(doc.baseUri().contains("signin.ebay"))
+				throw new IllegalAccessException("robot check!!!");
 		} catch (Exception e) {
 			e.printStackTrace();
 			log.error(log.getName() + " : program error: " + e);
@@ -69,6 +71,8 @@ public class OfferParser extends Parser implements Runnable {
 		insert();
 		
 		update();
+
+		log.info(log.getName() + " : offer pool: " + ThreadPoolMirror.dumpThreadPool(itemId, OfferPool.getInstance()));
 	}
 
 	/**
@@ -94,19 +98,19 @@ public class OfferParser extends Parser implements Runnable {
 						this.price.add(StringUtils.isNotBlank(tds.get(2).text()) && StringUtils.isNotBlank(tds.get(2).text().replaceAll("[^\\d.]", "")) ? Double.valueOf(tds.get(2).text().replaceAll("[^\\d.]", "")) : null);
 						this.quantity.add(StringUtils.isNotBlank(tds.get(3).text()) && StringUtils.isNotBlank(tds.get(3).text().replaceAll("[^\\d]", "")) ? Integer.valueOf(tds.get(3).text().replaceAll("[^\\d]", "")) : null);
 						this.purchaseDate.add(StringUtils.isNotBlank(tds.get(4).text()) ? tds.get(4).text() : null);
-					} else if (tds.size() == 2) { // 2是总销量，或colspan=10
-						if (tds.text().contains("shows the last 100 transactions ")) {
-							String tmp = tds.text().substring(tds.text().indexOf("transactions")).replaceAll("[^\\d]", "");
-							this.sold = StringUtils.isNotBlank(tmp) ? Integer.valueOf(tmp) : null;
-						} else {
-							this.sold = trs.size();
-						}
 					}
 				}
 			} catch (Exception e) {
 				e.printStackTrace();
 				log.error("itemId: [" + itemId + "] parse error, Html : \n" + element.html(), e);
 			}
+		}
+		if (trs.select(SOLD_SELECTOR).size() > 0) {
+			String tmp = trs.select("td:contains(shows the last 100 transactions)").last().text();
+			tmp = tmp.substring(tmp.indexOf("transactions")).replaceAll("[^\\d]", "");
+			this.sold = StringUtils.isNotBlank(tmp) ? Integer.valueOf(tmp) : null;
+		} else {
+			this.sold = trs.size();
 		}
 	}
 
@@ -155,8 +159,10 @@ public class OfferParser extends Parser implements Runnable {
 
 	void update() {
 		try {
-			DBUtil.execute(DBUtil.openConnection(), "update t_listing set sold = " + this.sold + " where item_id=" + this.itemId
-					+ " and  id in (select id  from (select max(id) as id from t_listing where item_id=" + this.itemId + " ) tmp )");
+			String sql = "update t_listing set sold = " + this.sold + " where item_id=" + this.itemId
+					+ " and  id in (select id  from (select max(id) as id from t_listing where item_id=" + this.itemId + " ) tmp )";
+			DBUtil.execute(DBUtil.openConnection(), sql);
+			log.info(log.getName() + " : update Stock SQL: " + sql);
 			// + " and site = '" + this.itemId + "'"
 		} catch (Exception e) {
 			e.printStackTrace();

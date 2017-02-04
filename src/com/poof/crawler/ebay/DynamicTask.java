@@ -20,7 +20,6 @@ import org.quartz.JobDetail;
 import org.quartz.Scheduler;
 import org.quartz.SchedulerException;
 import org.quartz.Trigger;
-import org.springframework.context.support.ClassPathXmlApplicationContext;
 import org.springframework.scheduling.quartz.MethodInvokingJobDetailFactoryBean;
 
 import com.poof.crawler.db.entity.Schedule;
@@ -36,8 +35,11 @@ public class DynamicTask {
 
 	private static Logger log = Logger.getLogger(DynamicTask.class);
 
-	private ClassPathXmlApplicationContext context = new ClassPathXmlApplicationContext("application.xml");
-	private Scheduler schedulerFactory = (Scheduler) context.getBean("schedulerFactory");
+	private Scheduler scheduler;
+
+	public DynamicTask(Scheduler scheduler) {
+		this.scheduler = scheduler;
+	}
 
 	/**
 	 * 更新定时任务的触发表达式
@@ -52,10 +54,10 @@ public class DynamicTask {
 		try {
 			CronTrigger trigger = (CronTrigger) getTrigger(triggerName, Scheduler.DEFAULT_GROUP);
 			if (start) {
-				schedulerFactory.resumeTrigger(trigger.getName(), trigger.getGroup());
+				scheduler.resumeTrigger(trigger.getName(), trigger.getGroup());
 				log.info("trigger the start successfully!!");
 			} else {
-				schedulerFactory.pauseTrigger(trigger.getName(), trigger.getGroup());
+				scheduler.pauseTrigger(trigger.getName(), trigger.getGroup());
 				log.info("trigger the pause successfully!!");
 			}
 			return true;
@@ -85,7 +87,7 @@ public class DynamicTask {
 				return true;
 			}
 			trigger.setCronExpression(cronExpression);
-			schedulerFactory.rescheduleJob(trigger.getName(), trigger.getGroup(), trigger);
+			scheduler.rescheduleJob(trigger.getName(), trigger.getGroup(), trigger);
 			// updateSpringMvcTaskXML(trigger, cronExpression);
 			log.info("Update the cronExpression successfully!!");
 			return true;
@@ -116,7 +118,7 @@ public class DynamicTask {
 			return null;
 		}
 		try {
-			trigger = schedulerFactory.getTrigger(triggerName, groupName);
+			trigger = scheduler.getTrigger(triggerName, groupName);
 		} catch (SchedulerException e) {
 			return null;
 		}
@@ -182,39 +184,41 @@ public class DynamicTask {
 	 */
 	public void dynamicExec(List<Schedule> list, boolean start) throws Exception {
 		for (int i = 0; i < list.size(); i++) {
-			CronTrigger trigger = (CronTrigger) schedulerFactory.getTrigger(list.get(i).getName() + list.get(i).getId(), Scheduler.DEFAULT_GROUP);
+			CronTrigger trigger = (CronTrigger) scheduler.getTrigger(list.get(i).getName() + list.get(i).getId(), Scheduler.DEFAULT_GROUP);
 			if (null == trigger) {// 如果不存在该trigger则创建一个
-				MethodInvokingJobDetailFactoryBean jobDetail = new MethodInvokingJobDetailFactoryBean();
-				jobDetail.setConcurrent(false);
-				jobDetail.setTargetMethod("execute");
-				jobDetail.setName(list.get(i).getName() + list.get(i).getId());
+				if ("true".equals(list.get(i).getStatus())) {
+					MethodInvokingJobDetailFactoryBean jobDetail = new MethodInvokingJobDetailFactoryBean();
+					jobDetail.setConcurrent(false);
+					jobDetail.setTargetMethod("execute");
+					jobDetail.setName(list.get(i).getName() + list.get(i).getId());
 
-				if ("1".equals(list.get(i).getType())) {
-					jobDetail.setTargetObject(KeyWordPool.getInstance());
-					jobDetail.setArguments(new Object[] { new PlaceEbayByKeyWordFetcher(list.get(i)) });
-				} else if ("2".equals(list.get(i).getType())) {
-					jobDetail.setTargetObject(SellerIDPool.getInstance());
-					jobDetail.setArguments(new Object[] { new PlaceEbayBySellerIdFetcher(list.get(i)) });
+					if ("1".equals(list.get(i).getType())) {
+						jobDetail.setTargetObject(KeyWordPool.getInstance());
+						jobDetail.setArguments(new Object[] { new PlaceEbayByKeyWordFetcher(list.get(i)) });
+					} else if ("2".equals(list.get(i).getType())) {
+						jobDetail.setTargetObject(SellerIDPool.getInstance());
+						jobDetail.setArguments(new Object[] { new PlaceEbayBySellerIdFetcher(list.get(i)) });
+					}
+					jobDetail.afterPropertiesSet();
+
+					trigger = new CronTrigger(list.get(i).getName() + list.get(i).getId(), Scheduler.DEFAULT_GROUP, list.get(i).getCronexp());
+					scheduler.scheduleJob((JobDetail) jobDetail.getObject(), trigger);
+					this.startOrStop(trigger.getName(), start);
+					log.info("new schedule name: [" + (list.get(i).getName() + list.get(i).getId()) + "] runned...");
 				}
-				jobDetail.afterPropertiesSet();
-
-				trigger = new CronTrigger(list.get(i).getName() + list.get(i).getId(), Scheduler.DEFAULT_GROUP, list.get(i).getCronexp());
-				schedulerFactory.scheduleJob((JobDetail) jobDetail.getObject(), trigger);
-				log.info("new schedule name: [" + (list.get(i).getName() + list.get(i).getId()) + "] runned...");
 			} else if (null != trigger) {
 				// Trigger已存在，那么更新相应的定时设置
-				if ("1".equals(list.get(i).getStatus())) {
-					trigger.setCronExpression(list.get(i).getCronexp());
-					schedulerFactory.rescheduleJob(trigger.getName(), trigger.getGroup(), trigger);
+				if ("true".equals(list.get(i).getStatus())) {
+					updateCronExpression(trigger.getName(), list.get(i).getCronexp());
+					this.startOrStop(trigger.getName(), start);
 					log.info("exists schedule name: [" + (list.get(i).getName() + list.get(i).getId()) + "] refreshed...");
 				} else {
 					remove(list.get(i).getName() + list.get(i).getId());
 					log.info("invaild schedule name: [" + (list.get(i).getName() + list.get(i).getId()) + "] deleted...");
 				}
 			}
-			schedulerFactory.triggerJob(list.get(i).getName() + list.get(i).getId(), Scheduler.DEFAULT_GROUP);
-			if (trigger != null)
-				this.startOrStop(trigger.getName(), start);
+//			if(trigger != null)
+//			schedulerFactory.triggerJob(list.get(i).getName() + list.get(i).getId(), Scheduler.DEFAULT_GROUP);
 		}
 	}
 
@@ -228,9 +232,9 @@ public class DynamicTask {
 
 		CronTrigger trigger = (CronTrigger) getTrigger(triggerName, Scheduler.DEFAULT_GROUP);
 		if (trigger != null) {
-			schedulerFactory.pauseTrigger(trigger.getName(), Scheduler.DEFAULT_GROUP);// 停止触发器
-			schedulerFactory.unscheduleJob(trigger.getName(), Scheduler.DEFAULT_GROUP);// 移除触发器
-			schedulerFactory.deleteJob(trigger.getName(), Scheduler.DEFAULT_GROUP);// 删除任务
+			scheduler.pauseTrigger(trigger.getName(), Scheduler.DEFAULT_GROUP);// 停止触发器
+			scheduler.unscheduleJob(trigger.getName(), Scheduler.DEFAULT_GROUP);// 移除触发器
+			scheduler.deleteJob(trigger.getName(), Scheduler.DEFAULT_GROUP);// 删除任务
 		}
 	}
 

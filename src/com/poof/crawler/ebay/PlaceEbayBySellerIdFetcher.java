@@ -3,6 +3,8 @@ package com.poof.crawler.ebay;
 import java.net.URLEncoder;
 import java.util.Collections;
 import java.util.List;
+import java.util.Random;
+import java.util.concurrent.TimeUnit;
 
 import org.apache.log4j.Logger;
 
@@ -32,8 +34,9 @@ public class PlaceEbayBySellerIdFetcher  extends PlaceEbayFetcher implements Run
 		List<ProxyHost> proxies = getProxyHost();
 		if(proxies != null)
 		Collections.shuffle(proxies);
-
+		
 		try {
+			TimeUnit.SECONDS.sleep(new Random().nextInt(30));
 			SellerIDListPool.getInstance().execute(new ListingParser(schedule, String.format(PRE_URL, schedule.getSite(), URLEncoder.encode(String.format(SELLERID_LIST_URL, schedule.getSite(), schedule.getSearchTerm(), 1), "UTF-8")) + END_URL, proxies != null && proxies.size() > 0 ? proxies .get(0) : null));
 		} catch (Exception e) {
 			e.printStackTrace();

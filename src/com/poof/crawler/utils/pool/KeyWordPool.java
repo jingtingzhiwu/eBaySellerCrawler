@@ -28,7 +28,7 @@ public class KeyWordPool {
 	public static ThreadPoolExecutor getInstance() {
 		if (executor == null) {
 			BlockingQueue<Runnable> queue = new LinkedBlockingQueue<Runnable>();
-			executor = new ThreadPoolExecutor(2, 2, 10, TimeUnit.SECONDS, queue);
+			executor = new ThreadPoolExecutor(5, 5, Long.MAX_VALUE, TimeUnit.NANOSECONDS, queue);
 		}
 
 		return executor;

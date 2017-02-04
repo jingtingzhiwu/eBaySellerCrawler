@@ -2,7 +2,6 @@ package com.poof.crawler.utils.dom;
 
 import java.sql.Connection;
 import java.sql.PreparedStatement;
-import java.sql.SQLException;
 import java.sql.Types;
 import java.util.LinkedList;
 import java.util.Random;
@@ -73,9 +72,26 @@ public class ListingParser extends Parser implements Runnable {
 		this.sold = new LinkedList<>();
 		this.fromAddr = new LinkedList<>();
 	}
+	
+	private void reset() {
+		this.img.clear();
+		this.title.clear();
+		this.sellerId.clear();
+		this.shipping.clear();
+		this.buyType.clear();
+		this.itemId.clear();
+		this.feedbackRate.clear();
+		this.beginPrice.clear();
+		this.endPrice.clear();
+		this.orgiPrice.clear();
+		this.ratings.clear();
+		this.sold.clear();
+		this.fromAddr.clear();
+	}
 
 	@Override
-	public synchronized void run() {
+	public void run() {
+		int pgn = 1;
 		while(true){
 			if(doc == null ) return;
 			Elements children = doc.select(LISTITEM_SELECTOR);
@@ -94,20 +110,22 @@ public class ListingParser extends Parser implements Runnable {
 			}
 
 			log.info("crossing [" + ("1".equals(schedule.getType()) ? "PlaceEbayByKeyWord" : ("2".equals(schedule.getType()) ? "PlaceEbayBySellerId" : "Other")) + "] "
-					+ "thread name: [" + schedule.getName() + "], site: [" + schedule.getSite() + "], searchterm: [" + schedule.getSearchTerm() + "], parse List ["+url+"] done. waiting [OfferParser] Thread going on");
-			try {
-				TimeUnit.SECONDS.sleep(new Random().nextInt(20));
-			} catch (InterruptedException e) {
-				e.printStackTrace();
-				log.error(log.getName() + " : program error: " + e);
-			}
+					+ "thread name: [" + schedule.getName() + "], site: [" + schedule.getSite() + "], searchterm: [" + schedule.getSearchTerm() + "], parse List ["+url+"] done. waiting [OfferParser: " + itemId.size() + "] Thread going on");
 			// 1. save db
 			insert();
 	
 			// 2. 10个子线程抓 销量
-			for (int i = 0; i < itemId.size(); i++) {
-				OfferPool.getInstance().execute(new OfferParser(String.format(OFFER_DETAIL_URL, schedule.getSite(), itemId.get(i)), this.proxy, itemId.get(i)));
-			}
+			new Runnable() {
+				public void run() {
+					for (int i = 0; i < itemId.size(); i++) {
+						OfferPool.getInstance().execute(new OfferParser(String.format(OFFER_DETAIL_URL, schedule.getSite(), itemId.get(i)), proxy, itemId.get(i)));
+						try {
+							TimeUnit.SECONDS.sleep(new Random().nextInt(30));
+						} catch (InterruptedException e) {
+						}
+					}
+				}
+			}.run();
 
 			//3. Keyword只抓第一页200条
 			if("1".equals(schedule.getType()))
@@ -115,19 +133,24 @@ public class ListingParser extends Parser implements Runnable {
 	
 			//4. 如果是根据SellerID则分页继续
 			if("2".equals(schedule.getType())){
-				url = parseNextPage(doc);
-				if (StringUtils.isBlank(url)) {
+				String result = parseNextPage(doc);
+				if (StringUtils.isBlank(result)) {
 					break;
 				}
 				try {
+					this.reset();
+					url = url.replace("%26_pgn%3D" + pgn + "%26_skc%3D" + (pgn * 200 - 200), "%26_pgn%3D" + (pgn + 1) + "%26_skc%3D" + ((pgn + 1) * 200 - 200));
 					this.doc = parseURL(url, proxy, null);
+					pgn++;
+					TimeUnit.SECONDS.sleep(new Random().nextInt(30));
 				} catch (Exception e) {
 					e.printStackTrace();
 					log.error("parse listing url [" + url + "] error, abort", e);
 				}
 			}
 		}
-		log.info("finished [PlaceEbayByKeyWord] thread name: [" + schedule.getName() + "], site: [" + schedule.getSite() + "], searchterm: [" + schedule.getSearchTerm() + "], parse List done. waiting [OfferParser] Thread going on");
+		log.info("finished [" + ("1".equals(schedule.getType()) ? "PlaceEbayByKeyWord" : ("2".equals(schedule.getType()) ? "PlaceEbayBySellerId" : "Other")) + "] "
+				+ "thread name: [" + schedule.getName() + "], site: [" + schedule.getSite() + "], searchterm: [" + schedule.getSearchTerm() + "]. ");
 	}
 
 	private void parseItemId(Element element) {
@@ -161,10 +184,22 @@ public class ListingParser extends Parser implements Runnable {
 
 	private void parseSellerId(Element element) {
 		try {
-			Elements sellerId = element.select(SELLERID_SELECTOR);
-			if (sellerId.size() == 0)
+			if (schedule != null && "2".equals(schedule.getType())) {
+				this.sellerId.add(schedule.getSearchTerm());
+				return;
+			}
+			Elements li = element.select(SELLERID_SELECTOR);
+			if (li.size() == 0)
 				throw new IllegalAccessException();
-			this.sellerId.add(sellerId.text().substring(sellerId.text().indexOf(": ") + 2, sellerId.text().indexOf("(")));
+			Elements sellerId = li.select("a");
+			if (sellerId.size() == 0) {
+				this.sellerId.add(null);
+			} else {
+				String tmp = sellerId.attr("href");
+				if (StringUtils.isNotBlank(tmp))
+					tmp = tmp.substring((tmp.lastIndexOf("/") > -1 ? tmp.lastIndexOf("/") + 1 : 0));
+				this.sellerId.add(tmp);
+			}
 		} catch (Exception e) {
 			log.error("itemId: [" + tmpId + "] error, cannot get [sellerId]" + "\n" + element.html(), e);
 			this.sellerId.add(null);
@@ -421,12 +456,12 @@ public class ListingParser extends Parser implements Runnable {
 			e.printStackTrace();
 			log.error(log.getName() + " : program error: " + e);
 		} finally {
-			try {
+			/*try {
 				DBUtil.closeConnection();
 			} catch (SQLException e) {
 				e.printStackTrace();
 				log.error(log.getName() + " : program error: " + e);
-			}
+			}*/
 		}
 	}
 

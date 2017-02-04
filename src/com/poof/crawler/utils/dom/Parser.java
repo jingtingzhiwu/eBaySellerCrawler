@@ -1,16 +1,13 @@
 package com.poof.crawler.utils.dom;
 
-import java.net.SocketException;
 import java.util.Map;
 import java.util.Random;
+import java.util.concurrent.TimeUnit;
 
 import org.jsoup.Connection;
 import org.jsoup.Connection.Response;
-import org.jsoup.HttpStatusException;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import com.poof.crawler.db.entity.ProxyHost;
 
@@ -18,7 +15,6 @@ public abstract class Parser {
 	abstract void insert();
 
 	public static final int INVALID_URL_STATUS_CODE = 404;
-	private static final Logger log = LoggerFactory.getLogger(Parser.class);
 	private static final String[] agents = new String[] { "Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/535.1 (KHTML, like Gecko) Chrome/14.0.835.163 Safari/535.1",
 			"Mozilla/5.0 (Windows NT 6.1; WOW64; rv:6.0) Gecko/20100101 Firefox/6.0", "Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/534.50 (KHTML, like Gecko) Version/5.1 Safari/534.50",
 			"Mozilla/5.0 (compatible; MSIE 9.0; Windows NT 6.1; Win64; x64; Trident/5.0; .NET CLR 2.0.50727; SLCC2; .NET CLR 3.5.30729; .NET CLR 3.0.30729; Media Center PC 6.0; InfoPath.3; .NET4.0C; Tablet PC 2.0; .NET4.0E)",
@@ -35,45 +31,35 @@ public abstract class Parser {
 	static String OFFER_DETAIL_URL = "http://offer.%s/ws/eBayISAPI.dll?ViewBidsLogin&item=%s&rt=nc&_trksid=p2047675.l2564";
 
 	protected Document parseURL(final String url, ProxyHost proxy, Map<String, String> cookies) throws Exception {
+		int failure = 0;
 		Document doc = null;
-		try {
-			Connection conn = null;
-			if (proxy == null)
-				conn = Jsoup.connect(url);
-			else
-				conn = Jsoup.connect(url).proxy(proxy.getIp(), proxy.getPort());
-			Response response = conn
-//					.cookies(cookies)
-					.header("User-Agent", agents[new Random().nextInt(agents.length)])
-					.header("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8")
-					.header("Accept-Encoding", "gzip, deflate, sdch")
-					.header("Accept-Language", "zh-CN,zh;q=0.8")
-					.header("Referer", "www.google.com")
-					.header("X-Forwarded-For", getRandomIp() + ", " + getRandomIp() + ", " + getRandomIp())
-					.timeout(1000 * 15).execute();
-			doc = response.parse();
-		} catch (Exception e) {
+		Connection conn = null;
+		if (proxy == null)
+			conn = Jsoup.connect(url);
+		else
+			conn = Jsoup.connect(url).proxy(proxy.getIp(), proxy.getPort());
+		while (true) {
 			try {
-				Connection conn = null;
-				if (proxy == null)
-					conn = Jsoup.connect(url);
-				else
-					conn = Jsoup.connect(url).proxy(proxy.getIp(), proxy.getPort());
 				Response response = conn
 //						.cookies(cookies)
-						.header("User-Agent", agents[new Random().nextInt(agents.length)])
-						.header("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8")
-						.header("Accept-Encoding", "gzip, deflate, sdch")
-						.header("Accept-Language", "zh-CN,zh;q=0.8")
-						.header("Referer", "www.google.com")
-						.header("X-Forwarded-For", getRandomIp() + ", " + getRandomIp() + ", " + getRandomIp())
-						.timeout(1000 * 15).execute();
+								.header("User-Agent", agents[new Random().nextInt(agents.length)])
+								.header("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8")
+								.header("Accept-Encoding", "gzip, deflate, sdch")
+								.header("Accept-Language", "zh-CN,zh;q=0.8")
+								.header("Referer", "www.google.com")
+								.header("X-Forwarded-For", getRandomIp() + ", " + getRandomIp() + ", " + getRandomIp())
+								.timeout(1000 * 60).execute();
 				doc = response.parse();
-			} catch (Exception e1) {
-				throw new IllegalAccessException("Parsing " + url + " get error, " + e.getMessage());
+				return doc;
+			} catch (Exception e) {
+				failure++;
+				TimeUnit.SECONDS.sleep(3);
+				if (failure > 10)
+					throw new IllegalAccessException("Parsing " + url + " get error, " + e.getMessage());
+				continue;
+			} finally {
 			}
 		}
-		return doc;
 	}
 
 	public static String getRandomIp() {

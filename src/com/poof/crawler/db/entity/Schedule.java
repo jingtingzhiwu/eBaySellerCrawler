@@ -7,7 +7,7 @@ public class Schedule {
 	private String type;
 	private String site;
 	private String search_term;
-	private int status;
+	private String status;
 
 	public String getId() {
 		return id;
@@ -41,11 +41,11 @@ public class Schedule {
 		this.type = type;
 	}
 
-	public int getStatus() {
+	public String getStatus() {
 		return status;
 	}
 
-	public void setStatus(int status) {
+	public void setStatus(String status) {
 		this.status = status;
 	}
 
