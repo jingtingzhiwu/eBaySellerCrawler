@@ -109,7 +109,7 @@ public class ListingParser extends Parser implements Runnable {
 				parseFromAddr(element);
 			}
 
-			log.info("crossing [" + ("1".equals(schedule.getType()) ? "PlaceEbayByKeyWord" : ("2".equals(schedule.getType()) ? "PlaceEbayBySellerId" : "Other")) + "] "
+			log.info("crossing [" + ("1".equals(schedule.getType()) ? "PlaceEbayByKeyWord" : ("2".equals(schedule.getType()) ? "PlaceEbayBySellerId" : "PlaceEbayByItemId")) + "] "
 					+ "thread name: [" + schedule.getName() + "], site: [" + schedule.getSite() + "], searchterm: [" + schedule.getSearchTerm() + "], parse List ["+url+"] done. waiting [OfferParser: " + itemId.size() + "] Thread going on");
 			// 1. save db
 			insert();
@@ -120,19 +120,19 @@ public class ListingParser extends Parser implements Runnable {
 					for (int i = 0; i < itemId.size(); i++) {
 						OfferPool.getInstance().execute(new OfferParser(String.format(OFFER_DETAIL_URL, schedule.getSite(), itemId.get(i)), proxy, itemId.get(i)));
 						try {
-							TimeUnit.SECONDS.sleep(new Random().nextInt(30));
+							TimeUnit.SECONDS.sleep(new Random().nextInt(20));
 						} catch (InterruptedException e) {
 						}
 					}
 				}
 			}.run();
 
-			//3. Keyword只抓第一页200条
-			if("1".equals(schedule.getType()))
+			//3. Keyword只抓第一页200条，ItemId只抓第一页
+			if (!"2".equals(schedule.getType()))
 				break;
 	
 			//4. 如果是根据SellerID则分页继续
-			if("2".equals(schedule.getType())){
+			else {
 				String result = parseNextPage(doc);
 				if (StringUtils.isBlank(result)) {
 					break;
@@ -142,14 +142,14 @@ public class ListingParser extends Parser implements Runnable {
 					url = url.replace("%26_pgn%3D" + pgn + "%26_skc%3D" + (pgn * 200 - 200), "%26_pgn%3D" + (pgn + 1) + "%26_skc%3D" + ((pgn + 1) * 200 - 200));
 					this.doc = parseURL(url, proxy, null);
 					pgn++;
-					TimeUnit.SECONDS.sleep(new Random().nextInt(30));
+					TimeUnit.SECONDS.sleep(new Random().nextInt(20));
 				} catch (Exception e) {
 					e.printStackTrace();
 					log.error("parse listing url [" + url + "] error, abort", e);
 				}
 			}
 		}
-		log.info("finished [" + ("1".equals(schedule.getType()) ? "PlaceEbayByKeyWord" : ("2".equals(schedule.getType()) ? "PlaceEbayBySellerId" : "Other")) + "] "
+		log.info("finished [" + ("1".equals(schedule.getType()) ? "PlaceEbayByKeyWord" : ("2".equals(schedule.getType()) ? "PlaceEbayBySellerId" : "PlaceEbayByItemId")) + "] "
 				+ "thread name: [" + schedule.getName() + "], site: [" + schedule.getSite() + "], searchterm: [" + schedule.getSearchTerm() + "]. ");
 	}
 

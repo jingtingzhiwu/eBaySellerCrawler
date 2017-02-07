@@ -36,9 +36,10 @@ public class PlaceEbayByKeyWordFetcher  extends PlaceEbayFetcher implements Runn
 		Collections.shuffle(proxies);
 
 		try {
-			TimeUnit.SECONDS.sleep(new Random().nextInt(30));
+			TimeUnit.SECONDS.sleep(new Random().nextInt(20));
 			KeyWordListPool.getInstance().execute(new ListingParser(schedule, String.format(PRE_URL, schedule.getSite(), URLEncoder.encode(String.format(ITEMID_LIST_URL, schedule.getSite(), schedule.getSearchTerm(), 1, 0), "UTF-8")) + END_URL, proxies != null && proxies.size() > 0 ? proxies .get(0) : null));
-			proxies.remove(0);
+			if (proxies != null)
+				proxies.remove(0);
 		} catch (Exception e) {
 			e.printStackTrace();
 		}

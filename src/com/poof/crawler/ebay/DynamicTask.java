@@ -198,6 +198,9 @@ public class DynamicTask {
 					} else if ("2".equals(list.get(i).getType())) {
 						jobDetail.setTargetObject(SellerIDPool.getInstance());
 						jobDetail.setArguments(new Object[] { new PlaceEbayBySellerIdFetcher(list.get(i)) });
+					} else if ("3".equals(list.get(i).getType())) {
+						jobDetail.setTargetObject(KeyWordPool.getInstance());
+						jobDetail.setArguments(new Object[] { new PlaceEbayByItemIdFetcher(list.get(i)) });
 					}
 					jobDetail.afterPropertiesSet();
 

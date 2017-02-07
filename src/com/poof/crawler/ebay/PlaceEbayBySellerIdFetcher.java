@@ -36,8 +36,10 @@ public class PlaceEbayBySellerIdFetcher  extends PlaceEbayFetcher implements Run
 		Collections.shuffle(proxies);
 		
 		try {
-			TimeUnit.SECONDS.sleep(new Random().nextInt(30));
+			TimeUnit.SECONDS.sleep(new Random().nextInt(20));
 			SellerIDListPool.getInstance().execute(new ListingParser(schedule, String.format(PRE_URL, schedule.getSite(), URLEncoder.encode(String.format(SELLERID_LIST_URL, schedule.getSite(), schedule.getSearchTerm(), 1), "UTF-8")) + END_URL, proxies != null && proxies.size() > 0 ? proxies .get(0) : null));
+			if (proxies != null)
+				proxies.remove(0);
 		} catch (Exception e) {
 			e.printStackTrace();
 		}

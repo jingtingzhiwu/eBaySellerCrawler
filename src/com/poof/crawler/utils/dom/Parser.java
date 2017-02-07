@@ -1,9 +1,11 @@
 package com.poof.crawler.utils.dom;
 
+import java.util.Base64;
 import java.util.Map;
 import java.util.Random;
 import java.util.concurrent.TimeUnit;
 
+import org.apache.commons.lang3.StringUtils;
 import org.jsoup.Connection;
 import org.jsoup.Connection.Response;
 import org.jsoup.Jsoup;
@@ -34,14 +36,16 @@ public abstract class Parser {
 		int failure = 0;
 		Document doc = null;
 		Connection conn = null;
-		if (proxy == null)
+		if (proxy == null) {
 			conn = Jsoup.connect(url);
-		else
+		} else {
 			conn = Jsoup.connect(url).proxy(proxy.getIp(), proxy.getPort());
+			if (StringUtils.isNotBlank(proxy.getUsername()))
+				conn = conn.header("Proxy-Authorization", "Basic " + Base64.getEncoder().encodeToString((proxy.getUsername() + ":" + proxy.getPwd()).getBytes()));
+		}
 		while (true) {
 			try {
 				Response response = conn
-//						.cookies(cookies)
 								.header("User-Agent", agents[new Random().nextInt(agents.length)])
 								.header("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8")
 								.header("Accept-Encoding", "gzip, deflate, sdch")
@@ -50,6 +54,10 @@ public abstract class Parser {
 								.header("X-Forwarded-For", getRandomIp() + ", " + getRandomIp() + ", " + getRandomIp())
 								.timeout(1000 * 60).execute();
 				doc = response.parse();
+				if (doc.baseUri().contains("signin.ebay")) { // robot check!!!
+					TimeUnit.SECONDS.sleep(60);
+					throw new IllegalAccessException("robot check!!!");
+				}
 				return doc;
 			} catch (Exception e) {
 				failure++;

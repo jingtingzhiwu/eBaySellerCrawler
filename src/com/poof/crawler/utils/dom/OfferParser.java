@@ -33,8 +33,6 @@ public class OfferParser extends Parser implements Runnable {
 	public OfferParser(String url, ProxyHost proxy, String itemId) {
 		try {
 			this.doc = parseURL(url, proxy, null);
-			if(doc.baseUri().contains("signin.ebay"))
-				throw new IllegalAccessException("robot check!!!");
 		} catch (Exception e) {
 			e.printStackTrace();
 			log.error(log.getName() + " : program error: " + e);
