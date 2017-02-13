@@ -10,6 +10,7 @@ import org.springframework.context.support.ClassPathXmlApplicationContext;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
+import com.alibaba.druid.pool.DruidDataSource;
 import com.poof.crawler.db.DBUtil;
 import com.poof.crawler.db.entity.Schedule;
 
@@ -40,6 +41,8 @@ public class App {
 	public static void main(String[] args) throws Exception {
 		ClassPathXmlApplicationContext context = new ClassPathXmlApplicationContext("application.xml");
 		schedulerFactory = (Scheduler) context.getBean("scheduler");
+		DruidDataSource dataSource = (DruidDataSource)context.getBean("dataSource");
+		DBUtil.setDataSource(dataSource);
 		context.start();
 		App app = new App();
 		app.DynamicTask();

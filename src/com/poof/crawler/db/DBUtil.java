@@ -5,7 +5,6 @@ import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.sql.CallableStatement;
 import java.sql.Connection;
-import java.sql.DriverManager;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.ResultSetMetaData;
@@ -18,31 +17,31 @@ import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Properties;
 
-import javax.sql.DataSource;
+import com.alibaba.druid.pool.DruidDataSource;
+import com.alibaba.druid.pool.DruidPooledConnection;
 
 public class DBUtil {
 
-	private static DataSource dataSource;
-
-	public static DataSource getDataSource() {
+	private static DruidDataSource dataSource;
+	public static DruidDataSource getDataSource() {
 		return dataSource;
 	}
 
-	public static void setDataSource(DataSource dataSource) {
+	public static void setDataSource(DruidDataSource dataSource) {
 		DBUtil.dataSource = dataSource;
 	}
 
-	private static Connection con = null;
+	private static DruidPooledConnection con = null;
 
-	public static Connection openConnection() throws IOException, ClassNotFoundException, SQLException {
-
-		if (null == con) {
-			Properties p = new Properties();
-			p.load(DBUtil.class.getResourceAsStream("/config.properties"));
+	public static DruidPooledConnection openConnection() throws SQLException, ClassNotFoundException, IOException {
+		
+		if (null == con || con.isClosed()) {
+			/*Properties p = new Properties();
+			p.load(DBUtil.class.getResourceAsStream("/jdbc.properties"));
 			Class.forName(p.getProperty("jdbc.driverClassName"));
-			con = DriverManager.getConnection(p.getProperty("jdbc.url"), p.getProperty("jdbc.username"), p.getProperty("jdbc.password"));
+			con = DriverManager.getConnection(p.getProperty("jdbc.url"), p.getProperty("jdbc.username"), p.getProperty("jdbc.password"));*/
+			con = dataSource.getConnection();
 		}
 		return con;
 	}

@@ -20,13 +20,15 @@ import com.poof.crawler.utils.pool.ThreadPoolMirror;
 public class OfferParser extends Parser implements Runnable {
 	private static final Logger log = LoggerFactory.getLogger(OfferParser.class);
 	private static final String REFER_SELECTOR = "[class=statusMessage]";
+	private static final String PRICE_SELECTOR = "[class*=priceData]";
 	private static final String SOLD_SELECTOR = "td:contains(shows the last 100 transactions)";
+	private static final String SOLD_SPECIAL = "Sold as a special offer";
 
 	private Document doc;
 	private String itemId;
 	private Integer sold;
 
-	private ArrayList<String> userId, purchaseDate, variation;
+	private ArrayList<String> userId, purchaseDate, variation, isOffer;
 	private ArrayList<Double> price;
 	private ArrayList<Integer> quantity;
 
@@ -44,8 +46,18 @@ public class OfferParser extends Parser implements Runnable {
 		this.quantity = new ArrayList<>();
 		this.purchaseDate = new ArrayList<>();
 		this.variation = new ArrayList<>();
+		this.isOffer = new ArrayList<>();
 	}
-
+	
+	private void reset() {
+		this.userId.clear();
+		this.price.clear();
+		this.quantity.clear();
+		this.purchaseDate.clear();
+		this.variation.clear();
+		this.isOffer.clear();
+	}
+	
 	/**
 	 *	REFER_SELECTOR	会有多个，如112051614873，取第一个，其他可忽略
 	 */
@@ -53,24 +65,26 @@ public class OfferParser extends Parser implements Runnable {
 	public void run() {
 		if(doc == null ) return;
 		Elements refer = doc.select(REFER_SELECTOR);
-		if (refer.size() == 0)
-			return;
-		if (refer.first() == null || refer.first().siblingElements().size() == 0)
-			return;
-		if (refer.first().siblingElements().select("table").size() == 0 || refer.first().siblingElements().select("table").last() == null)
-			return;
-		Element tableElement = refer.first().siblingElements().select("table").last();
-		Elements trs = tableElement.select("tr:gt(0)");
-		if (trs.size() == 0)
-			return;
+		if(refer.size() > 0){
+			for (Element element : refer) {
+				reset();
+				if (element == null || element.siblingElements().size() == 0)
+					return;
+				if (element.siblingElements().select("table").size() == 0 || element.siblingElements().select("table").last() == null)
+					return;
+				Element tableElement = element.siblingElements().select("table").last();
+				Elements trs = tableElement.select("tr:gt(0)");
+				if (trs.size() == 0)
+					return;
 
-		parseOfferHistory(trs);
+				parseOfferHistory(trs);
 
-		insert();
-		
-		update();
-
-		log.info(log.getName() + " : offer pool: " + ThreadPoolMirror.dumpThreadPool(itemId, OfferPool.getInstance()));
+				insert();
+				
+				update();
+				log.info(log.getName() + " : offer pool: " + ThreadPoolMirror.dumpThreadPool(itemId, OfferPool.getInstance()));
+			}
+		}
 	}
 
 	/**
@@ -90,13 +104,29 @@ public class OfferParser extends Parser implements Runnable {
 						this.price.add(StringUtils.isNotBlank(tds.get(3).text()) && StringUtils.isNotBlank(tds.get(3).text().replaceAll("[^\\d.]", "")) ? Double.valueOf(tds.get(3).text().replaceAll("[^\\d.]", "")) : null);
 						this.quantity.add(StringUtils.isNotBlank(tds.get(4).text()) && StringUtils.isNotBlank(tds.get(4).text().replaceAll("[^\\d]", "")) ? Integer.valueOf(tds.get(4).text().replaceAll("[^\\d]", "")) : null);
 						this.purchaseDate.add(StringUtils.isNotBlank(tds.get(5).text()) ? tds.get(5).text() : null);
-					} else if (tds.size() == 6) { // 6是单属性
+						this.isOffer.add("0");
+					} else if (tds.size() == 6) { // 6是单属性或offerHistory
+						String _currentprice = doc.select(PRICE_SELECTOR).first().text().replaceAll("[^\\d.]", "");
+						if (tds.get(2).text().equalsIgnoreCase(ACCEPTED)) {
+							this.price.add(StringUtils.isNotBlank(_currentprice) ? Double.valueOf(_currentprice) : null);
+							this.isOffer.add("1");
+						} else if (tds.get(2).text().equalsIgnoreCase(DECLINED) || tds.get(2).text().equalsIgnoreCase(EXPIRED) || tds.get(2).text().equalsIgnoreCase(PENDING)) {
+							continue;
+						} else {
+							if (tds.get(2).text().equalsIgnoreCase(SOLD_SPECIAL)) {
+								this.price.add(Double.valueOf(_currentprice));
+								this.isOffer.add("1");
+							} else {
+								this.price.add(StringUtils.isNotBlank(tds.get(2).text()) ? Double.valueOf(tds.get(2).text().replaceAll("[^\\d.]", "")) : null);
+								this.isOffer.add("0");
+							}
+						}
 						this.userId.add(StringUtils.isNotBlank(tds.get(1).text()) ? tds.get(1).text() : null);
 						this.variation.add(null);
-						this.price.add(StringUtils.isNotBlank(tds.get(2).text()) && StringUtils.isNotBlank(tds.get(2).text().replaceAll("[^\\d.]", "")) ? Double.valueOf(tds.get(2).text().replaceAll("[^\\d.]", "")) : null);
 						this.quantity.add(StringUtils.isNotBlank(tds.get(3).text()) && StringUtils.isNotBlank(tds.get(3).text().replaceAll("[^\\d]", "")) ? Integer.valueOf(tds.get(3).text().replaceAll("[^\\d]", "")) : null);
 						this.purchaseDate.add(StringUtils.isNotBlank(tds.get(4).text()) ? tds.get(4).text() : null);
 					}
+				
 				}
 			} catch (Exception e) {
 				e.printStackTrace();
@@ -114,7 +144,7 @@ public class OfferParser extends Parser implements Runnable {
 
 	@Override
 	void insert() {
-		String sql = "insert into t_listing_offer (item_id, user_id, variation, price, quantity, purchase_date) values (?,?,?,?,?,?);";
+		String sql = "insert into t_listing_offer (item_id, user_id, variation, price, quantity, purchase_date, is_offer) values (?,?,?,?,?,?,?);";
 		Connection conn = null;
 		try {
 			conn = DBUtil.openConnection();
@@ -141,6 +171,7 @@ public class OfferParser extends Parser implements Runnable {
 					else
 						pstmt.setInt(5, this.quantity.get(_index));
 					pstmt.setString(6, this.purchaseDate.get(_index));
+					pstmt.setString(7, this.isOffer.get(_index));
 					pstmt.addBatch();
 				}
 				pstmt.executeBatch();

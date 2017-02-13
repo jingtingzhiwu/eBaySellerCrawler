@@ -9,7 +9,7 @@ import org.jsoup.Jsoup;
 
 public class Proxytest {
 	public static void main(String[] args) {
-		Connection conn = Jsoup.connect("http://www.baidu.com").proxy("162.219.224.224",29842);
+		Connection conn = Jsoup.connect("http://www.ebay.com").proxy("164.132.211.218",3129);
 
 		try {
 			Response response = conn.execute();
