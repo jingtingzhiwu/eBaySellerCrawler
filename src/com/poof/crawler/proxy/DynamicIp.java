@@ -13,7 +13,7 @@ import org.slf4j.LoggerFactory;
 
 public class DynamicIp implements Runnable {
 	private static final Logger log = LoggerFactory.getLogger(DynamicIp.class);
-	private final static String order = "df53b80213e148bc99ffad40294ec487";
+	private final static String order = "";
 	private static volatile long gettimes = 0;
 	private static List<HttpProxy> lastIP = new ArrayList<HttpProxy>();
 
