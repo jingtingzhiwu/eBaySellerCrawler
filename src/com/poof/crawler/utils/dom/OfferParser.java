@@ -2,8 +2,11 @@ package com.poof.crawler.utils.dom;
 
 import java.sql.Connection;
 import java.sql.PreparedStatement;
+import java.sql.Timestamp;
 import java.sql.Types;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Locale;
 
 import org.apache.commons.lang3.StringUtils;
 import org.jsoup.nodes.Document;
@@ -13,9 +16,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.poof.crawler.db.DBUtil;
-import com.poof.crawler.db.entity.ProxyHost;
-import com.poof.crawler.utils.pool.OfferPool;
-import com.poof.crawler.utils.pool.ThreadPoolMirror;
+import com.poof.crawler.proxy.HttpProxy;
 
 public class OfferParser extends Parser implements Runnable {
 	private static final Logger log = LoggerFactory.getLogger(OfferParser.class);
@@ -23,6 +24,9 @@ public class OfferParser extends Parser implements Runnable {
 	private static final String PRICE_SELECTOR = "[class*=priceData]";
 	private static final String SOLD_SELECTOR = "td:contains(shows the last 100 transactions)";
 	private static final String SOLD_SPECIAL = "Sold as a special offer";
+	// private static final SimpleDateFormat sdf = new
+	// SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
+	private static final SimpleDateFormat ensdf = new SimpleDateFormat("MMM-d-yy HH:mm:ss", Locale.US);
 
 	private Document doc;
 	private String itemId;
@@ -31,16 +35,13 @@ public class OfferParser extends Parser implements Runnable {
 	private ArrayList<String> userId, purchaseDate, variation, isOffer;
 	private ArrayList<Double> price;
 	private ArrayList<Integer> quantity;
+	private HttpProxy httpProxy;
+	private String url;
 
-	public OfferParser(String url, ProxyHost proxy, String itemId) {
-		try {
-			this.doc = parseURL(url, proxy, null);
-		} catch (Exception e) {
-			e.printStackTrace();
-			log.error(log.getName() + " : program error: " + e);
-		}
-
+	public OfferParser(String url, HttpProxy httpProxy, String itemId) {
 		this.itemId = itemId;
+		this.url = url;
+		this.httpProxy = httpProxy;
 		this.userId = new ArrayList<>();
 		this.price = new ArrayList<>();
 		this.quantity = new ArrayList<>();
@@ -48,7 +49,7 @@ public class OfferParser extends Parser implements Runnable {
 		this.variation = new ArrayList<>();
 		this.isOffer = new ArrayList<>();
 	}
-	
+
 	private void reset() {
 		this.userId.clear();
 		this.price.clear();
@@ -57,15 +58,23 @@ public class OfferParser extends Parser implements Runnable {
 		this.variation.clear();
 		this.isOffer.clear();
 	}
-	
+
 	/**
-	 *	REFER_SELECTOR	会有多个，如112051614873，取第一个，其他可忽略
+	 * REFER_SELECTOR 会有多个，如112051614873，取第一个，其他可忽略
 	 */
 	@Override
 	public void run() {
-		if(doc == null ) return;
+		try {
+			this.doc = parseURL(url, httpProxy, null);
+		} catch (Exception e) {
+			e.printStackTrace();
+			log.error(log.getName() + " : program error: " + e);
+		}
+
+		if (doc == null)
+			return;
 		Elements refer = doc.select(REFER_SELECTOR);
-		if(refer.size() > 0){
+		if (refer.size() > 0) {
 			for (Element element : refer) {
 				reset();
 				if (element == null || element.siblingElements().size() == 0)
@@ -80,17 +89,19 @@ public class OfferParser extends Parser implements Runnable {
 				parseOfferHistory(trs);
 
 				insert();
-				
+
 				update();
-				log.info(log.getName() + " : offer pool: " + ThreadPoolMirror.dumpThreadPool(itemId, OfferPool.getInstance()));
+				log.info(log.getName() + " : offer parse done: " + itemId);
 			}
 		}
+		else
+			log.info(log.getName() + " : None offer parse: " + itemId);
 	}
 
 	/**
 	 * 
-	 * @param 
-	 * price 	Sold as a special offer
+	 * @param price
+	 *            Sold as a special offer
 	 */
 	private void parseOfferHistory(Elements trs) {
 		for (Element element : trs) {
@@ -101,8 +112,10 @@ public class OfferParser extends Parser implements Runnable {
 						// tds.get(0) 是ebay留出来的空白单元格
 						this.userId.add(StringUtils.isNotBlank(tds.get(1).text()) ? tds.get(1).text() : null);
 						this.variation.add(StringUtils.isNotBlank(tds.get(2).text()) ? tds.get(2).text() : null);
-						this.price.add(StringUtils.isNotBlank(tds.get(3).text()) && StringUtils.isNotBlank(tds.get(3).text().replaceAll("[^\\d.]", "")) ? Double.valueOf(tds.get(3).text().replaceAll("[^\\d.]", "")) : null);
-						this.quantity.add(StringUtils.isNotBlank(tds.get(4).text()) && StringUtils.isNotBlank(tds.get(4).text().replaceAll("[^\\d]", "")) ? Integer.valueOf(tds.get(4).text().replaceAll("[^\\d]", "")) : null);
+						this.price.add(StringUtils.isNotBlank(tds.get(3).text()) && StringUtils.isNotBlank(tds.get(3).text().replaceAll("[^\\d.]", ""))
+								? Double.valueOf(tds.get(3).text().replaceAll("[^\\d.]", "")) : null);
+						this.quantity.add(StringUtils.isNotBlank(tds.get(4).text()) && StringUtils.isNotBlank(tds.get(4).text().replaceAll("[^\\d]", ""))
+								? Integer.valueOf(tds.get(4).text().replaceAll("[^\\d]", "")) : null);
 						this.purchaseDate.add(StringUtils.isNotBlank(tds.get(5).text()) ? tds.get(5).text() : null);
 						this.isOffer.add("0");
 					} else if (tds.size() == 6) { // 6是单属性或offerHistory
@@ -123,10 +136,11 @@ public class OfferParser extends Parser implements Runnable {
 						}
 						this.userId.add(StringUtils.isNotBlank(tds.get(1).text()) ? tds.get(1).text() : null);
 						this.variation.add(null);
-						this.quantity.add(StringUtils.isNotBlank(tds.get(3).text()) && StringUtils.isNotBlank(tds.get(3).text().replaceAll("[^\\d]", "")) ? Integer.valueOf(tds.get(3).text().replaceAll("[^\\d]", "")) : null);
+						this.quantity.add(StringUtils.isNotBlank(tds.get(3).text()) && StringUtils.isNotBlank(tds.get(3).text().replaceAll("[^\\d]", ""))
+								? Integer.valueOf(tds.get(3).text().replaceAll("[^\\d]", "")) : null);
 						this.purchaseDate.add(StringUtils.isNotBlank(tds.get(4).text()) ? tds.get(4).text() : null);
 					}
-				
+
 				}
 			} catch (Exception e) {
 				e.printStackTrace();
@@ -170,7 +184,7 @@ public class OfferParser extends Parser implements Runnable {
 						pstmt.setNull(5, Types.DOUBLE);
 					else
 						pstmt.setInt(5, this.quantity.get(_index));
-					pstmt.setString(6, this.purchaseDate.get(_index));
+					pstmt.setTimestamp(6, new Timestamp(ensdf.parse(this.purchaseDate.get(_index)).getTime()));
 					pstmt.setString(7, this.isOffer.get(_index));
 					pstmt.addBatch();
 				}
@@ -188,21 +202,13 @@ public class OfferParser extends Parser implements Runnable {
 
 	void update() {
 		try {
-			String sql = "update t_listing set sold = " + this.sold + " where item_id=" + this.itemId
-					+ " and  id in (select id  from (select max(id) as id from t_listing where item_id=" + this.itemId + " ) tmp )";
+			String sql = "update t_listing set sold = " + this.sold + " where item_id=" + this.itemId + " and  id in (select id  from (select max(id) as id from t_listing where item_id=" + this.itemId
+					+ " ) tmp )";
 			DBUtil.execute(DBUtil.openConnection(), sql);
-			log.info(log.getName() + " : update Stock SQL: " + sql);
-			// + " and site = '" + this.itemId + "'"
 		} catch (Exception e) {
 			e.printStackTrace();
 			log.error(log.getName() + " : program error: " + e);
 		} finally {
-			/*try {
-				DBUtil.closeConnection();
-			} catch (SQLException e) {
-				e.printStackTrace();
-				log.error(log.getName() + " : program error: " + e);
-			}*/
 		}
 	}
 }

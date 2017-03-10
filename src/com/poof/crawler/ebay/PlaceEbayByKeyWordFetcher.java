@@ -1,14 +1,9 @@
 package com.poof.crawler.ebay;
 
 import java.net.URLEncoder;
-import java.util.Collections;
-import java.util.List;
-import java.util.Random;
-import java.util.concurrent.TimeUnit;
 
 import org.apache.log4j.Logger;
 
-import com.poof.crawler.db.entity.ProxyHost;
 import com.poof.crawler.db.entity.Schedule;
 import com.poof.crawler.utils.dom.ListingParser;
 import com.poof.crawler.utils.pool.KeyWordListPool;
@@ -31,15 +26,9 @@ public class PlaceEbayByKeyWordFetcher  extends PlaceEbayFetcher implements Runn
 	public void run() {
 
 		log.info("starting [PlaceEbayByKeyWord] thread name: [" + schedule.getName() + "], site: [" + schedule.getSite() + "], searchterm: [" + schedule.getSearchTerm() + "]");
-		List<ProxyHost> proxies = getProxyHost();
-		if(proxies != null)
-		Collections.shuffle(proxies);
 
 		try {
-			TimeUnit.SECONDS.sleep(new Random().nextInt(20));
-			KeyWordListPool.getInstance().execute(new ListingParser(schedule, String.format(PRE_URL, schedule.getSite(), URLEncoder.encode(String.format(ITEMID_LIST_URL, schedule.getSite(), schedule.getSearchTerm(), 1, 0), "UTF-8")) + END_URL, proxies != null && proxies.size() > 0 ? proxies .get(0) : null));
-			if (proxies != null)
-				proxies.remove(0);
+			KeyWordListPool.getInstance().execute(new ListingParser(schedule, String.format(PRE_URL, schedule.getSite(), URLEncoder.encode(String.format(ITEMID_LIST_URL, schedule.getSite(), schedule.getSearchTerm(), 1, 0), "UTF-8")) + END_URL, getUSProxyHost()));
 		} catch (Exception e) {
 			e.printStackTrace();
 		}

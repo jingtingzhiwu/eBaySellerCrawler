@@ -1,7 +1,6 @@
 package com.poof.crawler.test;
 
 import java.io.UnsupportedEncodingException;
-import java.net.URLEncoder;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -12,9 +11,6 @@ import org.apache.log4j.Logger;
 import com.poof.crawler.db.DBUtil;
 import com.poof.crawler.db.entity.ProxyHost;
 import com.poof.crawler.db.entity.Schedule;
-import com.poof.crawler.utils.dom.ListingParser;
-import com.poof.crawler.utils.pool.KeyWordListPool;
-import com.poof.crawler.utils.pool.SellerIDListPool;
 
 /**
  * @author wilkey
@@ -63,7 +59,7 @@ public class EbayFetcher {
 		Collections.shuffle(proxies);
 
 		for (int i = 1; i <= BYKEYWORD_MAX_PAGES.length; i++) {
-			KeyWordListPool.getInstance().execute(new ListingParser(schedule, String.format(PRE_URL, schedule.getSite(), URLEncoder.encode(String.format(ITEMID_LIST_URL, schedule.getSite(), schedule.getSearchTerm(), i, 200 * i - 200), "UTF-8")) + END_URL, proxies.get(0)));
+//			KeyWordListPool.getInstance().execute(new ListingParser(schedule, String.format(PRE_URL, schedule.getSite(), URLEncoder.encode(String.format(ITEMID_LIST_URL, schedule.getSite(), schedule.getSearchTerm(), i, 200 * i - 200), "UTF-8")) + END_URL, proxies.get(0)));
 			proxies.remove(0);
 		}
 	}
@@ -74,7 +70,7 @@ public class EbayFetcher {
 		Collections.shuffle(proxies);
 
 		for (int i = 1; i <= BYKEYWORD_MAX_PAGES.length; i++) {
-			SellerIDListPool.getInstance().execute(new ListingParser(schedule, String.format(PRE_URL, schedule.getSite(), URLEncoder.encode(String.format(SELLERID_LIST_URL, schedule.getSite(), schedule.getSearchTerm(), i), "UTF-8")) + END_URL, proxies.get(0)));
+//			SellerIDListPool.getInstance().execute(new ListingParser(schedule, String.format(PRE_URL, schedule.getSite(), URLEncoder.encode(String.format(SELLERID_LIST_URL, schedule.getSite(), schedule.getSearchTerm(), i), "UTF-8")) + END_URL, proxies.get(0)));
 			proxies.remove(0);
 		}
 	}

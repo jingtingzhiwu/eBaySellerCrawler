@@ -8,6 +8,7 @@ public class Schedule {
 	private String site;
 	private String search_term;
 	private String status;
+	private String create_by;
 
 	public String getId() {
 		return id;
@@ -63,5 +64,21 @@ public class Schedule {
 
 	public void setSearchTerm(String searchTerm) {
 		this.search_term = searchTerm;
+	}
+
+	public String getSearch_term() {
+		return search_term;
+	}
+
+	public void setSearch_term(String search_term) {
+		this.search_term = search_term;
+	}
+
+	public String getCreate_by() {
+		return create_by;
+	}
+
+	public void setCreate_by(String create_by) {
+		this.create_by = create_by;
 	}
 }

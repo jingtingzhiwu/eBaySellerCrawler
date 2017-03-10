@@ -4,12 +4,10 @@ import org.quartz.JobDetail;
 import org.quartz.Scheduler;
 import org.springframework.beans.factory.xml.XmlBeanFactory;
 import org.springframework.core.io.ClassPathResource;
-import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.scheduling.quartz.CronTriggerBean;
 import org.springframework.scheduling.quartz.MethodInvokingJobDetailFactoryBean;
 
-import com.poof.crawler.ebay.App;
-import com.poof.crawler.test.EbayFetcher;
+import com.poof.crawler.App;
 
 public class DynamicJob {
 

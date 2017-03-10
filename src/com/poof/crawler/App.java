@@ -1,4 +1,4 @@
-package com.poof.crawler.ebay;
+package com.poof.crawler;
 
 import java.sql.SQLException;
 import java.util.ArrayList;
@@ -13,6 +13,8 @@ import org.springframework.stereotype.Component;
 import com.alibaba.druid.pool.DruidDataSource;
 import com.poof.crawler.db.DBUtil;
 import com.poof.crawler.db.entity.Schedule;
+import com.poof.crawler.ebay.DynamicTask;
+import com.poof.crawler.proxy.DynamicIp;
 
 /**
  * @author wilkey
@@ -46,6 +48,7 @@ public class App {
 		context.start();
 		App app = new App();
 		app.DynamicTask();
+		new Thread(new DynamicIp()).start();
 		System.err.println("starting......");
 		System.in.read();
 	}

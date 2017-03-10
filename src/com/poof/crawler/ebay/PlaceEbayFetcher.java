@@ -1,16 +1,16 @@
 package com.poof.crawler.ebay;
 
 import java.sql.SQLException;
-import java.util.ArrayList;
 import java.util.List;
 
 import org.apache.log4j.Logger;
 
 import com.poof.crawler.db.DBUtil;
 import com.poof.crawler.db.entity.ProxyHost;
+import com.poof.crawler.proxy.ProxyPool;
 
 /**
- * @author wilkey 
+ * @author wilkey
  * @mail admin@wilkey.vip
  * @Date 2017年1月18日 上午10:47:18
  */
@@ -19,15 +19,11 @@ public class PlaceEbayFetcher {
 	private static Logger log = Logger.getLogger(PlaceEbayFetcher.class);
 
 	/**
-	 * @param
-	 * 	PRE_URL					自定义显示选项URL
-	 * 	ITEMID_LIST_URL		List页面参数URL
-	 * 	SELLERID_LIST_URL	根据卖家ID查询URL
+	 * @param PRE_URL
+	 *            自定义显示选项URL ITEMID_LIST_URL List页面参数URL SELLERID_LIST_URL
+	 *            根据卖家ID查询URL
 	 * 
-	 * @desc
-	 * ebay最多显示10000条
-	 * 每页200条
-	 * 根据关键字取前1页，即前200条
+	 * @desc ebay最多显示10000条 每页200条 根据关键字取前1页，即前200条
 	 */
 	protected static final Integer[] BYKEYWORD_MAX_PAGES = new Integer[] { 1 };
 	protected final int BYSELLERID_MAX_PAGE = 50;
@@ -36,21 +32,29 @@ public class PlaceEbayFetcher {
 	protected String ITEMID_LIST_URL = "http://www.%s/sch/i.html?_from=R40&_sacat=0&_sop=12&_nkw=%s&_pgn=%s&_skc=%s&rt=nc";
 	protected String SELLERID_LIST_URL = "http://www.%s/sch/m.html?_ipg=200&_sop=12&_ssn=%s&_pgn=%s&_skc=0&_sac=1#seeAllAnchorLink";
 
-	protected List<ProxyHost> getProxyHost() {
-		try {
-			List<ProxyHost> list = DBUtil.queryBeanList(DBUtil.openConnection(), "select * from t_proxy_host", ProxyHost.class);
-			return list;
-		} catch (Exception e) {
-			e.printStackTrace();
-			log.error(log.getName() + " : program error: " + e);
-		} finally {
+	private static volatile ProxyPool proxyPool = null;
+
+	public static ProxyPool getUSProxyHost() {
+		if (proxyPool == null) {
 			try {
-				DBUtil.closeConnection();
-			} catch (SQLException e) {
+				proxyPool = new ProxyPool();
+				List<ProxyHost> list = DBUtil.queryBeanList(DBUtil.openConnection(), "select * from t_proxy_host", ProxyHost.class);
+				for (ProxyHost proxyHost : list) {
+					proxyPool.add(proxyHost.getIp(), proxyHost.getPort(), proxyHost.getUsername(), proxyHost.getPwd());
+				}
+			} catch (Exception e) {
 				e.printStackTrace();
 				log.error(log.getName() + " : program error: " + e);
+			} finally {
+				try {
+					DBUtil.closeConnection();
+				} catch (SQLException e) {
+					e.printStackTrace();
+					log.error(log.getName() + " : program error: " + e);
+				}
 			}
 		}
-		return null;
+
+		return proxyPool;
 	}
 }

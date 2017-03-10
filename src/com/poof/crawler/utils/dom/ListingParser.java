@@ -2,9 +2,9 @@ package com.poof.crawler.utils.dom;
 
 import java.sql.Connection;
 import java.sql.PreparedStatement;
+import java.sql.SQLException;
 import java.sql.Types;
 import java.util.LinkedList;
-import java.util.Random;
 import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -17,9 +17,13 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.poof.crawler.db.DBUtil;
-import com.poof.crawler.db.entity.ProxyHost;
 import com.poof.crawler.db.entity.Schedule;
+import com.poof.crawler.ebay.PlaceEbayFetcher;
+import com.poof.crawler.proxy.DynamicIp;
+import com.poof.crawler.proxy.HttpProxy;
+import com.poof.crawler.proxy.ProxyPool;
 import com.poof.crawler.utils.pool.OfferPool;
+import com.poof.crawler.utils.pool.ThreadPoolMirror;
 
 public class ListingParser extends Parser implements Runnable {
 	private static final String IMG_SELECTOR = "img.img";
@@ -40,24 +44,17 @@ public class ListingParser extends Parser implements Runnable {
 
 	private Document doc;
 	private String tmpId, url;
-	private ProxyHost proxy;
 	private Schedule schedule;
 
 	private LinkedList<String> img, title, sellerId, shipping, buyType, itemId, fromAddr;
 	private LinkedList<Double> feedbackRate, beginPrice, endPrice, orgiPrice;
 	private LinkedList<Integer> ratings, sold;
+	private HttpProxy httpProxy;
 
-	public ListingParser(Schedule schedule, String url, ProxyHost proxy) {
-		try {
-			this.url = url;
-			this.doc = parseURL(url, proxy, null);
-		} catch (Exception e) {
-			e.printStackTrace();
-			log.error("parse listing url [" + url + "] error, abort", e);
-		}
-
+	public ListingParser(Schedule schedule, String url, ProxyPool proxypool) {
+		this.httpProxy = proxypool.borrow();
+		this.url = url;
 		this.schedule = schedule;
-		this.proxy = proxy;
 		this.img = new LinkedList<>();
 		this.title = new LinkedList<>();
 		this.sellerId = new LinkedList<>();
@@ -91,6 +88,13 @@ public class ListingParser extends Parser implements Runnable {
 
 	@Override
 	public void run() {
+		try {
+			this.doc = parseURL(url, httpProxy, null);
+		} catch (Exception e) {
+			e.printStackTrace();
+			log.error("parse listing url [" + url + "] error, abort", e);
+		}
+		
 		int pgn = 1;
 		while(true){
 			if(doc == null ) return;
@@ -115,21 +119,26 @@ public class ListingParser extends Parser implements Runnable {
 			insert();
 	
 			// 2. 10个子线程抓 销量
-			new Runnable() {
-				public void run() {
-					for (int i = 0; i < itemId.size(); i++) {
-						OfferPool.getInstance().execute(new OfferParser(String.format(OFFER_DETAIL_URL, schedule.getSite(), itemId.get(i)), proxy, itemId.get(i)));
-						try {
-							TimeUnit.SECONDS.sleep(new Random().nextInt(20));
-						} catch (InterruptedException e) {
-						}
+
+			int size = itemId.size() / 5;
+			size = itemId.size() % 5 >= 0 ? size + 1 : size;
+			for (int i = 0; i < size; i++) {
+				HttpProxy proxy = DynamicIp.getAProxy();
+				for (int j = 0; j < (i == size - 1 ? itemId.size() % 5 : 5); j++) {
+					int _index = i * 5 + j;
+					OfferPool.getInstance().execute(new OfferParser(String.format(OFFER_DETAIL_URL, schedule.getSite(), itemId.get(_index)), proxy, itemId.get(_index)));
+					log.info(log.getName() + " -> index:" + _index + "," + proxy + " : offer pool: " + ThreadPoolMirror.dumpThreadPool(itemId.get(_index), OfferPool.getInstance()));
+					try {
+						TimeUnit.SECONDS.sleep(j+1);
+					} catch (InterruptedException e) {
 					}
 				}
-			}.run();
+			}
 
 			//3. Keyword只抓第一页200条，ItemId只抓第一页
-			if (!"2".equals(schedule.getType()))
+			if (!"2".equals(schedule.getType())){
 				break;
+			}
 	
 			//4. 如果是根据SellerID则分页继续
 			else {
@@ -137,15 +146,16 @@ public class ListingParser extends Parser implements Runnable {
 				if (StringUtils.isBlank(result)) {
 					break;
 				}
+				HttpProxy httpProxy= PlaceEbayFetcher.getUSProxyHost().borrow();
 				try {
 					this.reset();
 					url = url.replace("%26_pgn%3D" + pgn + "%26_skc%3D" + (pgn * 200 - 200), "%26_pgn%3D" + (pgn + 1) + "%26_skc%3D" + ((pgn + 1) * 200 - 200));
-					this.doc = parseURL(url, proxy, null);
+					this.doc = parseURL(url, httpProxy, null);
 					pgn++;
-					TimeUnit.SECONDS.sleep(new Random().nextInt(20));
 				} catch (Exception e) {
 					e.printStackTrace();
 					log.error("parse listing url [" + url + "] error, abort", e);
+				} finally {
 				}
 			}
 		}
@@ -165,7 +175,7 @@ public class ListingParser extends Parser implements Runnable {
 				throw new IllegalAccessException();
 			this.img.add(img.attr("src"));
 		} catch (Exception e) {
-			log.error("itemId: [" + tmpId + "] error, cannot get [img]" + "\n" + element.html(), e);
+//			log.error("itemId: [" + tmpId + "] error, cannot get [img]", e);
 			this.img.add(null);
 		}
 	}
@@ -177,7 +187,7 @@ public class ListingParser extends Parser implements Runnable {
 				throw new IllegalAccessException();
 			this.title.add(title.text());
 		} catch (Exception e) {
-			log.error("itemId: [" + tmpId + "] error, cannot get [title]" + "\n" + element.html(), e);
+//			log.error("itemId: [" + tmpId + "] error, cannot get [title]", e);
 			this.title.add(null);
 		}
 	}
@@ -201,7 +211,7 @@ public class ListingParser extends Parser implements Runnable {
 				this.sellerId.add(tmp);
 			}
 		} catch (Exception e) {
-			log.error("itemId: [" + tmpId + "] error, cannot get [sellerId]" + "\n" + element.html(), e);
+//			log.error("itemId: [" + tmpId + "] error, cannot get [sellerId]", e);
 			this.sellerId.add(null);
 		}
 	}
@@ -213,7 +223,7 @@ public class ListingParser extends Parser implements Runnable {
 				throw new IllegalAccessException();
 			this.shipping.add(shipping.text());
 		} catch (Exception e) {
-			log.error("itemId: [" + tmpId + "] error, cannot get [shipping]" + "\n" + element.html(), e);
+//			log.error("itemId: [" + tmpId + "] error, cannot get [shipping]", e);
 			this.shipping.add(null);
 		}
 	}
@@ -225,7 +235,7 @@ public class ListingParser extends Parser implements Runnable {
 				throw new IllegalAccessException();
 			this.buyType.add(buyType.last().text());
 		} catch (Exception e) {
-			log.error("itemId: [" + tmpId + "] error, cannot get [buyType]" + "\n" + element.html(), e);
+//			log.error("itemId: [" + tmpId + "] error, cannot get [buyType]", e);
 			this.buyType.add(null);
 		}
 	}
@@ -241,7 +251,7 @@ public class ListingParser extends Parser implements Runnable {
 			else
 				this.feedbackRate.add(null);
 		} catch (Exception e) {
-			log.error("itemId: [" + tmpId + "] error, cannot get [feedbackRate]" + "\n" + element.html(), e);
+//			log.error("itemId: [" + tmpId + "] error, cannot get [feedbackRate]", e);
 			this.feedbackRate.add(null);
 		}
 	}
@@ -316,7 +326,7 @@ public class ListingParser extends Parser implements Runnable {
 			// "0" : e.text().replaceAll("[$,£,EUR,CDN$,?]", "");
 			// //$美国，澳大利亚，//EUR,法国，德国，£,英国，CDN$,加拿大
 		} catch (Exception e) {
-			log.error("itemId: [" + tmpId + "] error, cannot get [price]" + "\n" + element.html(), e);
+//			log.error("itemId: [" + tmpId + "] error, cannot get [price]", e);
 			this.beginPrice.add(null);
 			this.endPrice.add(null);
 			this.orgiPrice.add(null);
@@ -334,7 +344,7 @@ public class ListingParser extends Parser implements Runnable {
 			else
 				this.ratings.add(0);
 		} catch (Exception e) {
-			log.error("itemId: [" + tmpId + "] error, cannot get [ratings]" + "\n" + element.html(), e);
+//			log.error("itemId: [" + tmpId + "] error, cannot get [ratings]", e);
 			this.ratings.add(0);
 		}
 	}
@@ -376,7 +386,7 @@ public class ListingParser extends Parser implements Runnable {
 				this.fromAddr.add(null);
 			}
 		} catch (Exception e) {
-			log.error("itemId: [" + tmpId + "] error, cannot get [fromAddr]" + "\n" + element.html(), e);
+//			log.error("itemId: [" + tmpId + "] error, cannot get [fromAddr]", e);
 			this.fromAddr.add(null);
 		}
 	}
@@ -396,7 +406,7 @@ public class ListingParser extends Parser implements Runnable {
 
 	// save to db
 	void insert() {
-		String sql = "insert into t_listing (schedule_id, site, item_id, title, seller_id, shipping, buy_type, from_addr, feedback_rate, begin_price, end_price, org_price, ratings, sold) values (?,?,?,?,?,?,?,?,?,?,?,?,?,?);";
+		String sql = "insert into t_listing (schedule_id, site, item_id, title, seller_id, shipping, buy_type, from_addr, feedback_rate, begin_price, end_price, org_price, ratings, sold, create_by) values (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?);";
 		Connection conn = null;
 		try {
 			conn = DBUtil.openConnection();
@@ -445,6 +455,7 @@ public class ListingParser extends Parser implements Runnable {
 						pstmt.setNull(14, Types.INTEGER);
 					else
 						pstmt.setInt(14, this.sold.get(_index));
+					pstmt.setString(15, schedule.getCreate_by());
 					pstmt.addBatch();
 				}
 				pstmt.executeBatch();
@@ -456,12 +467,12 @@ public class ListingParser extends Parser implements Runnable {
 			e.printStackTrace();
 			log.error(log.getName() + " : program error: " + e);
 		} finally {
-			/*try {
+			try {
 				DBUtil.closeConnection();
 			} catch (SQLException e) {
 				e.printStackTrace();
 				log.error(log.getName() + " : program error: " + e);
-			}*/
+			}
 		}
 	}
 

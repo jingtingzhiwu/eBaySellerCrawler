@@ -1,5 +1,6 @@
 package com.poof.crawler.utils.dom;
 
+import java.net.InetSocketAddress;
 import java.util.Base64;
 import java.util.Map;
 import java.util.Random;
@@ -11,7 +12,7 @@ import org.jsoup.Connection.Response;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 
-import com.poof.crawler.db.entity.ProxyHost;
+import com.poof.crawler.proxy.HttpProxy;
 
 public abstract class Parser {
 	abstract void insert();
@@ -36,16 +37,17 @@ public abstract class Parser {
 
 	static String OFFER_DETAIL_URL = "http://offer.%s/ws/eBayISAPI.dll?ViewBidsLogin&item=%s&rt=nc&_trksid=p2047675.l2564";
 
-	protected Document parseURL(final String url, ProxyHost proxy, Map<String, String> cookies) throws Exception {
+	protected Document parseURL(final String url, HttpProxy httpProxy, Map<String, String> cookies) throws Exception {
 		int failure = 0;
 		Document doc = null;
 		Connection conn = null;
-		if (proxy == null) {
+		if (null == httpProxy || null == httpProxy.getProxy()) {
 			conn = Jsoup.connect(url);
 		} else {
-			conn = Jsoup.connect(url).proxy(proxy.getIp(), proxy.getPort());
-			if (StringUtils.isNotBlank(proxy.getUsername()))
-				conn = conn.header("Proxy-Authorization", "Basic " + Base64.getEncoder().encodeToString((proxy.getUsername() + ":" + proxy.getPwd()).getBytes()));
+			InetSocketAddress address = (InetSocketAddress) httpProxy.getProxy().address();
+			conn = Jsoup.connect(url).proxy(address.getHostName(), address.getPort());
+			if (StringUtils.isNotBlank(httpProxy.getUsername()))
+				conn = conn.header("Proxy-Authorization", "Basic " + Base64.getEncoder().encodeToString((httpProxy.getUsername() + ":" + httpProxy.getPassword()).getBytes()));
 		}
 		while (true) {
 			try {

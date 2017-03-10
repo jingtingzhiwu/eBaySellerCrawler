@@ -28,7 +28,7 @@ public class SellerIDPool {
 	public static ThreadPoolExecutor getInstance() {
 		if (executor == null) {
 			BlockingQueue<Runnable> queue = new LinkedBlockingQueue<Runnable>();
-			executor = new ThreadPoolExecutor(5, 5, Long.MAX_VALUE, TimeUnit.NANOSECONDS, queue);
+			executor = new ThreadPoolExecutor(5, 5, 10, TimeUnit.SECONDS, queue);
 		}
 
 		return executor;
