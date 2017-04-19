@@ -54,7 +54,9 @@ public class ProxyPool {
 	 */
 	public HttpProxy borrow() {
 		HttpProxy httpProxy = null;
-		httpProxy = idleQueue.get(new Random().nextInt(idleQueue.size()));
+		if (idleQueue.size() == 0)
+			return null;
+		httpProxy = idleQueue.get((idleQueue.size() > 1 ? new Random().nextInt(idleQueue.size()) : 1));
 
 		HttpProxy p = totalQueue.get(httpProxy.getKey());
 		p.borrow();

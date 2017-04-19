@@ -10,10 +10,10 @@ import java.util.concurrent.TimeUnit;
  * @mail admin@wilkey.vip
  * @Date 2017年1月10日 下午4:25:58
  */
-public class KeyWordListPool {
+public class ListingPool {
 	private static volatile ThreadPoolExecutor executor = null;
 
-	private KeyWordListPool() {
+	private ListingPool() {
 	}
 
 	public static ThreadPoolExecutor getInstance(int corePoolSize, int maximumPoolSize, long aliveTime, TimeUnit unit) {
@@ -28,7 +28,7 @@ public class KeyWordListPool {
 	public static ThreadPoolExecutor getInstance() {
 		if (executor == null) {
 			BlockingQueue<Runnable> queue = new LinkedBlockingQueue<Runnable>();
-			executor = new ThreadPoolExecutor(10, 10, Long.MAX_VALUE, TimeUnit.SECONDS, queue);
+			executor = new ThreadPoolExecutor(100, 100, Long.MAX_VALUE, TimeUnit.SECONDS, queue);
 		}
 
 		return executor;

@@ -1,6 +1,5 @@
 package com.poof.crawler;
 
-import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -56,7 +55,7 @@ public class App {
 	public List<Schedule> getScheduleFromDB() {
 		try {
 			List<Schedule> result = new ArrayList<Schedule>();
-			List<Schedule> vaild = DBUtil.queryBeanList(DBUtil.openConnection(), "select * from t_schedule where status = 1 group by search_term,site,type order by type ", Schedule.class);
+			List<Schedule> vaild = DBUtil.queryBeanList(DBUtil.openConnection(), "select * from t_schedule where status = 1 group by search_term,site,type order by type desc", Schedule.class);
 			List<Schedule> invaild = DBUtil.queryBeanList(DBUtil.openConnection(), "select * from t_schedule where status = 0 ", Schedule.class);
 			log.info("refreshing DynamicTask to crawl eBay, activity schedule: [" + (vaild != null ? vaild.size() : 0) + "], deleted schedule: [" + (invaild != null ? invaild.size() : 0) + "]");
 			if (!vaild.isEmpty())
@@ -67,11 +66,6 @@ public class App {
 		} catch (Exception e) {
 			e.printStackTrace();
 		} finally {
-			try {
-				DBUtil.closeConnection();
-			} catch (SQLException e) {
-				e.printStackTrace();
-			}
 		}
 		return new ArrayList<Schedule>();
 	}

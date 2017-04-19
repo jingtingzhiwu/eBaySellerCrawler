@@ -83,12 +83,6 @@ public class EbayFetcher {
 			e.printStackTrace();
 			log.error(log.getName() + " : program error: " + e);
 		} finally {
-			try {
-				DBUtil.closeConnection();
-			} catch (SQLException e) {
-				e.printStackTrace();
-				log.error(log.getName() + " : program error: " + e);
-			}
 		}
 		return new ArrayList<ProxyHost>();
 	}

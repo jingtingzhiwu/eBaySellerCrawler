@@ -25,10 +25,10 @@ public class PlaceEbayBySellerIdFetcher  extends PlaceEbayFetcher implements Run
 	@Override
 	public void run() {
 
-		log.info("starting [PlaceEbayBySellerId] thread name: [" + schedule.getName() + "], site: [" + schedule.getSite() + "], searchterm: [" + schedule.getSearchTerm() + "]");
+		log.info("starting [PlaceEbayBySellerId] , searchterm: [" + schedule.getSearchTerm() + "]");
 		
 		try {
-			SellerIDListPool.getInstance().execute(new ListingParser(schedule, String.format(PRE_URL, schedule.getSite(), URLEncoder.encode(String.format(SELLERID_LIST_URL, schedule.getSite(), schedule.getSearchTerm(), 1), "UTF-8")) + END_URL, getUSProxyHost()));
+			SellerIDListPool.getInstance().execute(new ListingParser(schedule, String.format(PRE_URL, schedule.getSite(), URLEncoder.encode(String.format(SELLERID_LIST_URL, schedule.getSite(), schedule.getSearchTerm(), 1), "UTF-8")) + END_URL));
 		} catch (Exception e) {
 			e.printStackTrace();
 		}

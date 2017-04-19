@@ -24,7 +24,7 @@ public class PlaceEbayByItemIdFetcher extends PlaceEbayFetcher implements Runnab
 	@Override
 	public void run() {
 
-		log.info("starting [PlaceEbayByItemId] thread name: [" + schedule.getName() + "], site: [" + schedule.getSite() + "], searchterm: [" + schedule.getSearchTerm() + "]");
+		log.info("starting [PlaceEbayByItemId] , searchterm: [" + schedule.getSearchTerm() + "]");
 
 		try {
 			String[] itemids = schedule.getSearchTerm().replaceAll("\\s*|\\t|\\r|\\n", "").split(",");
@@ -32,7 +32,7 @@ public class PlaceEbayByItemIdFetcher extends PlaceEbayFetcher implements Runnab
 				final int index = i;
 				if (StringUtils.isBlank(itemids[i]))
 					continue;
-				KeyWordListPool.getInstance().execute(new ListingParser(schedule, String.format(ITEMID_LIST_URL, schedule.getSite(), itemids[index].trim(), 1, 0), getUSProxyHost()));
+				KeyWordListPool.getInstance().execute(new ListingParser(schedule, String.format(ITEMID_LIST_URL, schedule.getSite(), itemids[index].trim(), 1, 0)));
 			}
 		} catch (Exception e) {
 			e.printStackTrace();

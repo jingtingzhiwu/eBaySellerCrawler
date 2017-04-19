@@ -7,6 +7,8 @@ import java.sql.Types;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Locale;
+import java.util.Random;
+import java.util.concurrent.TimeUnit;
 
 import org.apache.commons.lang3.StringUtils;
 import org.jsoup.nodes.Document;
@@ -16,12 +18,17 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.poof.crawler.db.DBUtil;
+import com.poof.crawler.ebay.PlaceEbayFetcher;
+import com.poof.crawler.proxy.DynamicIp;
 import com.poof.crawler.proxy.HttpProxy;
+import com.poof.crawler.utils.pool.OfferPool;
+import com.poof.crawler.utils.pool.ThreadPoolMirror;
 
 public class OfferParser extends Parser implements Runnable {
 	private static final Logger log = LoggerFactory.getLogger(OfferParser.class);
 	private static final String REFER_SELECTOR = "[class=statusMessage]";
 	private static final String PRICE_SELECTOR = "[class*=priceData]";
+	private static final String EXPRICE_SELECTOR = "[class*=MaxBidPlusFont]";
 	private static final String SOLD_SELECTOR = "td:contains(shows the last 100 transactions)";
 	private static final String SOLD_SPECIAL = "Sold as a special offer";
 	// private static final SimpleDateFormat sdf = new
@@ -30,18 +37,18 @@ public class OfferParser extends Parser implements Runnable {
 
 	private Document doc;
 	private String itemId;
-	private Integer sold;
+	private Integer sold, proxyIndex;
 
 	private ArrayList<String> userId, purchaseDate, variation, isOffer;
 	private ArrayList<Double> price;
 	private ArrayList<Integer> quantity;
-	private HttpProxy httpProxy;
-	private String url;
+	private String url, refer;
 
-	public OfferParser(String url, HttpProxy httpProxy, String itemId) {
+	public OfferParser(String url, String itemId, int proxyIndex, String refer) {
 		this.itemId = itemId;
 		this.url = url;
-		this.httpProxy = httpProxy;
+		this.refer = refer;
+		this.proxyIndex = proxyIndex;
 		this.userId = new ArrayList<>();
 		this.price = new ArrayList<>();
 		this.quantity = new ArrayList<>();
@@ -64,8 +71,10 @@ public class OfferParser extends Parser implements Runnable {
 	 */
 	@Override
 	public void run() {
+		HttpProxy proxy = DynamicIp.getAProxy(proxyIndex);
 		try {
-			this.doc = parseURL(url, httpProxy, null);
+			TimeUnit.SECONDS.sleep(new Random().nextInt(10));
+			this.doc = new Parser().parseURL(url, proxy, null, refer);
 		} catch (Exception e) {
 			e.printStackTrace();
 			log.error(log.getName() + " : program error: " + e);
@@ -91,10 +100,9 @@ public class OfferParser extends Parser implements Runnable {
 				insert();
 
 				update();
-				log.info(log.getName() + " : offer parse done: " + itemId);
+				log.info(log.getName() + " : offer parse done > " + proxy + ": " + ThreadPoolMirror.dumpThreadPool(itemId, OfferPool.getInstance()));
 			}
-		}
-		else
+		} else
 			log.info(log.getName() + " : None offer parse: " + itemId);
 	}
 
@@ -112,32 +120,40 @@ public class OfferParser extends Parser implements Runnable {
 						// tds.get(0) 是ebay留出来的空白单元格
 						this.userId.add(StringUtils.isNotBlank(tds.get(1).text()) ? tds.get(1).text() : null);
 						this.variation.add(StringUtils.isNotBlank(tds.get(2).text()) ? tds.get(2).text() : null);
-						this.price.add(StringUtils.isNotBlank(tds.get(3).text()) && StringUtils.isNotBlank(tds.get(3).text().replaceAll("[^\\d.]", ""))
-								? Double.valueOf(tds.get(3).text().replaceAll("[^\\d.]", "")) : null);
-						this.quantity.add(StringUtils.isNotBlank(tds.get(4).text()) && StringUtils.isNotBlank(tds.get(4).text().replaceAll("[^\\d]", ""))
-								? Integer.valueOf(tds.get(4).text().replaceAll("[^\\d]", "")) : null);
+						this.price.add(tds.get(3).text().matches(".*\\d+\\.?\\d.*") ? Double.valueOf(tds.get(3).text().replaceAll("[^\\d.]", "")) : null);
+						this.quantity.add(tds.get(4).text().matches(".*\\d+\\.?\\d.*") ? Integer.valueOf(tds.get(4).text().replaceAll("[^\\d]", "")) : null);
 						this.purchaseDate.add(StringUtils.isNotBlank(tds.get(5).text()) ? tds.get(5).text() : null);
 						this.isOffer.add("0");
 					} else if (tds.size() == 6) { // 6是单属性或offerHistory
-						String _currentprice = doc.select(PRICE_SELECTOR).first().text().replaceAll("[^\\d.]", "");
-						if (tds.get(2).text().equalsIgnoreCase(ACCEPTED)) {
+						String _currentprice = null;
+						if (tds.get(2).text().matches(".*\\d+\\.?\\d.*")) {
+							_currentprice = tds.get(2).text().replaceAll("[^\\d.]", "");
+						} else {
+							if (doc.select(EXPRICE_SELECTOR).isEmpty() || doc.select(EXPRICE_SELECTOR) == null) {
+								if (!doc.select(PRICE_SELECTOR).isEmpty() && doc.select(PRICE_SELECTOR) != null)
+									_currentprice = doc.select(PRICE_SELECTOR).first().text().replaceAll("[^\\d.]", "");
+							} else {
+								_currentprice = doc.select(EXPRICE_SELECTOR).first().text().replaceAll("[^\\d.]", "");
+							}
+						}
+						if (tds.get(2).text().equalsIgnoreCase(PlaceEbayFetcher.ACCEPTED)) {
 							this.price.add(StringUtils.isNotBlank(_currentprice) ? Double.valueOf(_currentprice) : null);
 							this.isOffer.add("1");
-						} else if (tds.get(2).text().equalsIgnoreCase(DECLINED) || tds.get(2).text().equalsIgnoreCase(EXPIRED) || tds.get(2).text().equalsIgnoreCase(PENDING)) {
+						} else if (tds.get(2).text().equalsIgnoreCase(PlaceEbayFetcher.DECLINED) || tds.get(2).text().equalsIgnoreCase(PlaceEbayFetcher.EXPIRED)
+								|| tds.get(2).text().equalsIgnoreCase(PlaceEbayFetcher.PENDING)) {
 							continue;
 						} else {
 							if (tds.get(2).text().equalsIgnoreCase(SOLD_SPECIAL)) {
-								this.price.add(Double.valueOf(_currentprice));
+								this.price.add(StringUtils.isNotBlank(_currentprice) ? Double.valueOf(_currentprice) : null);
 								this.isOffer.add("1");
 							} else {
-								this.price.add(StringUtils.isNotBlank(tds.get(2).text()) ? Double.valueOf(tds.get(2).text().replaceAll("[^\\d.]", "")) : null);
+								this.price.add(tds.get(2).text().matches(".*\\d+\\.?\\d.*") ? Double.valueOf(tds.get(2).text().replaceAll("[^\\d.]", "")) : null);
 								this.isOffer.add("0");
 							}
 						}
 						this.userId.add(StringUtils.isNotBlank(tds.get(1).text()) ? tds.get(1).text() : null);
 						this.variation.add(null);
-						this.quantity.add(StringUtils.isNotBlank(tds.get(3).text()) && StringUtils.isNotBlank(tds.get(3).text().replaceAll("[^\\d]", ""))
-								? Integer.valueOf(tds.get(3).text().replaceAll("[^\\d]", "")) : null);
+						this.quantity.add(tds.get(3).text().matches(".*\\d+\\.?\\d.*") ? Integer.valueOf(tds.get(3).text().replaceAll("[^\\d]", "")) : null);
 						this.purchaseDate.add(StringUtils.isNotBlank(tds.get(4).text()) ? tds.get(4).text() : null);
 					}
 
@@ -156,7 +172,6 @@ public class OfferParser extends Parser implements Runnable {
 		}
 	}
 
-	@Override
 	void insert() {
 		String sql = "insert into t_listing_offer (item_id, user_id, variation, price, quantity, purchase_date, is_offer) values (?,?,?,?,?,?,?);";
 		Connection conn = null;

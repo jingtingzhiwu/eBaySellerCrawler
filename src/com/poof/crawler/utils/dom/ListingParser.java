@@ -2,9 +2,11 @@ package com.poof.crawler.utils.dom;
 
 import java.sql.Connection;
 import java.sql.PreparedStatement;
-import java.sql.SQLException;
 import java.sql.Types;
+import java.util.HashMap;
 import java.util.LinkedList;
+import java.util.Map;
+import java.util.Random;
 import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -21,9 +23,7 @@ import com.poof.crawler.db.entity.Schedule;
 import com.poof.crawler.ebay.PlaceEbayFetcher;
 import com.poof.crawler.proxy.DynamicIp;
 import com.poof.crawler.proxy.HttpProxy;
-import com.poof.crawler.proxy.ProxyPool;
 import com.poof.crawler.utils.pool.OfferPool;
-import com.poof.crawler.utils.pool.ThreadPoolMirror;
 
 public class ListingParser extends Parser implements Runnable {
 	private static final String IMG_SELECTOR = "img.img";
@@ -41,22 +41,29 @@ public class ListingParser extends Parser implements Runnable {
 	private static final String LISTITEM_SELECTOR = "#ListViewInner li[id*=item]";
 	private static final String NEXT_PAGE_SELECTOR = "#Pagination .pages a.curr";
 	private static final Logger log = LoggerFactory.getLogger(ListingParser.class);
-
+	Map<String, String> cookieMap = new HashMap<String, String>();
+	
 	private Document doc;
 	private String tmpId, url;
 	private Schedule schedule;
 
-	private LinkedList<String> img, title, sellerId, shipping, buyType, itemId, fromAddr;
+	private LinkedList<String> img, title, titlehref, sellerId, shipping, buyType, itemId, fromAddr;
 	private LinkedList<Double> feedbackRate, beginPrice, endPrice, orgiPrice;
 	private LinkedList<Integer> ratings, sold;
-	private HttpProxy httpProxy;
 
-	public ListingParser(Schedule schedule, String url, ProxyPool proxypool) {
-		this.httpProxy = proxypool.borrow();
+	public ListingParser(Schedule schedule, String url) {
+		cookieMap.put("cssg", "7ab219a615b0a9cba970bea7fff4e320");
+		cookieMap.put("ebay", "%5Ecv%3D15555%5Ejs%3D1%5Edv%3D58f46826%5Esbf%3D%231c00000000190000000100%5Ecos%3D2%5E");
+		cookieMap.put("dp1", "bpbf/%232001800e000e000008100420000045ad59ed2^tzo/-1e058f47962^u1p/QEBfX0BAX19AQA**5ad59ed2^idm/158f5b316^bl/CN5cb6d252^");
+		cookieMap.put("ns1", "BAQAAAVtpwmFBAAaAANgAVlrVntJjODJ8NjAxXjE0OTE4NzgyNTg0MjZeXjBeM3wyfDR8NDJ8NDN8MTB8MzZ8MXwxMV4xXjReNF4xXjEyXjEyXjJeMV4xXjBeMF4wXjFeNjQ0MjQ1OTA3NVFHMzOsCTqSQb3gtghIr/sYpMb7");
+		cookieMap.put("lucky9", "4935857");
+		cookieMap.put("s", "CgAD4ACBY9bzSN2FiMjE5YTYxNWIwYTljYmE5NzBiZWE3ZmZmNGUzMjAA7gBuWPW80jMGaHR0cDovL3d3dy5lYmF5LmNvbS9zY2gvaS5odG1sP19mcm9tPVI0MCZfdHJrc2lkPXAyMDUwNjAxLm01NzAubDEzMTMuVFIwLlRSQzAuSDAuWHNzZC5UUlMwJl9ua3c9c3NkJl9zYWNhdD0wUGJ52A**");
+		cookieMap.put("nonsession", listCookies[new Random().nextInt(listCookies.length)]);
 		this.url = url;
 		this.schedule = schedule;
 		this.img = new LinkedList<>();
 		this.title = new LinkedList<>();
+		this.titlehref = new LinkedList<>();
 		this.sellerId = new LinkedList<>();
 		this.shipping = new LinkedList<>();
 		this.buyType = new LinkedList<>();
@@ -73,6 +80,7 @@ public class ListingParser extends Parser implements Runnable {
 	private void reset() {
 		this.img.clear();
 		this.title.clear();
+		this.titlehref.clear();
 		this.sellerId.clear();
 		this.shipping.clear();
 		this.buyType.clear();
@@ -88,11 +96,15 @@ public class ListingParser extends Parser implements Runnable {
 
 	@Override
 	public void run() {
+		HttpProxy proxy = null;
 		try {
-			this.doc = parseURL(url, httpProxy, null);
+			TimeUnit.SECONDS.sleep(new Random().nextInt(10));
+			proxy = DynamicIp.getAProxy();
+			//一年更新一次
+			this.doc = new Parser().parseURL(url, proxy, cookieMap, PlaceEbayFetcher.REFER_LIST_URL);
 		} catch (Exception e) {
 			e.printStackTrace();
-			log.error("parse listing url [" + url + "] error, abort", e);
+			log.error("parse listing url [" + url + "] error, " + e.getMessage());
 		}
 		
 		int pgn = 1;
@@ -114,27 +126,29 @@ public class ListingParser extends Parser implements Runnable {
 			}
 
 			log.info("crossing [" + ("1".equals(schedule.getType()) ? "PlaceEbayByKeyWord" : ("2".equals(schedule.getType()) ? "PlaceEbayBySellerId" : "PlaceEbayByItemId")) + "] "
-					+ "thread name: [" + schedule.getName() + "], site: [" + schedule.getSite() + "], searchterm: [" + schedule.getSearchTerm() + "], parse List ["+url+"] done. waiting [OfferParser: " + itemId.size() + "] Thread going on");
-			// 1. save db
-			insert();
-	
-			// 2. 10个子线程抓 销量
-
-			int size = itemId.size() / 5;
-			size = itemId.size() % 5 >= 0 ? size + 1 : size;
-			for (int i = 0; i < size; i++) {
-				HttpProxy proxy = DynamicIp.getAProxy();
-				for (int j = 0; j < (i == size - 1 ? itemId.size() % 5 : 5); j++) {
-					int _index = i * 5 + j;
-					OfferPool.getInstance().execute(new OfferParser(String.format(OFFER_DETAIL_URL, schedule.getSite(), itemId.get(_index)), proxy, itemId.get(_index)));
-					log.info(log.getName() + " -> index:" + _index + "," + proxy + " : offer pool: " + ThreadPoolMirror.dumpThreadPool(itemId.get(_index), OfferPool.getInstance()));
-					try {
-						TimeUnit.SECONDS.sleep(j+1);
-					} catch (InterruptedException e) {
-					}
-				}
+					+ ", searchterm: [" + schedule.getSearchTerm() + "], proxy: [" + proxy + "], parse List done. waiting [OfferParser: " + itemId.size() + "] Thread going on");
+			if (itemId.size() == 0) {
+				log.error("crossing searchterm: [" + schedule.getSearchTerm() + "], html: " + doc.html());
 			}
 
+			// 1. save db
+			insert();
+
+			// 2. 10个子线程抓 销量
+			new Runnable() {
+				@Override
+				public void run() {
+					int size = itemId.size() / 10;
+					size = itemId.size() % 10 >= 0 ? size + 1 : size;
+					for (int i = 0; i < size; i++) {
+						for (int j = 0; j < (i == size - 1 ? itemId.size() % 10 : 10); j++) {
+							int _index = i * 10 + j;
+							OfferPool.getInstance().execute(new OfferParser(String.format(PlaceEbayFetcher.OFFER_DETAIL_URL, schedule.getSite(), itemId.get(_index)), itemId.get(_index), j, titlehref.get(_index)));
+						}
+					}
+				}
+			}.run();
+			
 			//3. Keyword只抓第一页200条，ItemId只抓第一页
 			if (!"2".equals(schedule.getType())){
 				break;
@@ -146,11 +160,12 @@ public class ListingParser extends Parser implements Runnable {
 				if (StringUtils.isBlank(result)) {
 					break;
 				}
-				HttpProxy httpProxy= PlaceEbayFetcher.getUSProxyHost().borrow();
 				try {
+					TimeUnit.SECONDS.sleep(new Random().nextInt(10));
 					this.reset();
+					proxy = DynamicIp.getAProxy();
 					url = url.replace("%26_pgn%3D" + pgn + "%26_skc%3D" + (pgn * 200 - 200), "%26_pgn%3D" + (pgn + 1) + "%26_skc%3D" + ((pgn + 1) * 200 - 200));
-					this.doc = parseURL(url, httpProxy, null);
+					this.doc = new Parser().parseURL(url, proxy, cookieMap, PlaceEbayFetcher.REFER_LIST_URL);
 					pgn++;
 				} catch (Exception e) {
 					e.printStackTrace();
@@ -160,7 +175,7 @@ public class ListingParser extends Parser implements Runnable {
 			}
 		}
 		log.info("finished [" + ("1".equals(schedule.getType()) ? "PlaceEbayByKeyWord" : ("2".equals(schedule.getType()) ? "PlaceEbayBySellerId" : "PlaceEbayByItemId")) + "] "
-				+ "thread name: [" + schedule.getName() + "], site: [" + schedule.getSite() + "], searchterm: [" + schedule.getSearchTerm() + "]. ");
+				+ ", searchterm: [" + schedule.getSearchTerm() + "]. ");
 	}
 
 	private void parseItemId(Element element) {
@@ -186,6 +201,7 @@ public class ListingParser extends Parser implements Runnable {
 			if (title.size() == 0)
 				throw new IllegalAccessException();
 			this.title.add(title.text());
+			this.titlehref.add(title.attr("href"));
 		} catch (Exception e) {
 //			log.error("itemId: [" + tmpId + "] error, cannot get [title]", e);
 			this.title.add(null);
@@ -262,12 +278,12 @@ public class ListingParser extends Parser implements Runnable {
 			if (rangePrice.size() > 0 && StringUtils.isNotBlank(rangePrice.text())) {
 				String[] prcs = rangePrice.text().split("to");
 				if (prcs.length == 1) {
-					this.beginPrice.add(StringUtils.isNotBlank(prcs[0]) ? Double.valueOf(prcs[0].replaceAll("[^\\d.]", "")) : null);
+					this.beginPrice.add(prcs[0].matches(".*\\d+\\.?\\d.*") ? Double.valueOf(prcs[0].replaceAll("[^\\d.]", "")) : null);
 					this.endPrice.add(null);
 				}
 				if (prcs.length == 2) {
-					this.beginPrice.add(StringUtils.isNotBlank(prcs[0]) ? Double.valueOf(prcs[0].replaceAll("[^\\d.]", "")) : null);
-					this.endPrice.add(StringUtils.isNotBlank(prcs[1]) ? Double.valueOf(prcs[1].replaceAll("[^\\d.]", "")) : null);
+					this.beginPrice.add(prcs[0].matches(".*\\d+\\.?\\d.*") ? Double.valueOf(prcs[0].replaceAll("[^\\d.]", "")) : null);
+					this.endPrice.add(prcs[1].matches(".*\\d+\\.?\\d.*") ? Double.valueOf(prcs[1].replaceAll("[^\\d.]", "")) : null);
 				}
 
 				Elements orgiPrice = element.select(ORGIPRICE_SELECTOR);
@@ -467,12 +483,6 @@ public class ListingParser extends Parser implements Runnable {
 			e.printStackTrace();
 			log.error(log.getName() + " : program error: " + e);
 		} finally {
-			try {
-				DBUtil.closeConnection();
-			} catch (SQLException e) {
-				e.printStackTrace();
-				log.error(log.getName() + " : program error: " + e);
-			}
 		}
 	}
 

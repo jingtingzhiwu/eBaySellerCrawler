@@ -48,10 +48,10 @@
 	<classpathentry kind="lib" path="lib/quartz-1.8.6.jar"/>
 	<classpathentry kind="lib" path="lib/slf4j-api-1.5.8.jar"/>
 	<classpathentry kind="lib" path="lib/slf4j-log4j12-1.5.8.jar"/>
-	<classpathentry kind="lib" path="lib/jsoup-proxy-1.8.1.jar"/>
 	<classpathentry kind="lib" path="lib/dom4j-1.6.1.jar"/>
 	<classpathentry kind="lib" path="lib/aopalliance-1.0.jar"/>
 	<classpathentry kind="lib" path="lib/druid-1.0.25.jar"/>
 	<classpathentry kind="lib" path="lib/mysql-connector-java-5.1.40.jar"/>
+	<classpathentry kind="lib" path="lib/jsoup-proxy-1.8.1.jar"/>
 	<classpathentry kind="output" path="bin"/>
 </classpath>

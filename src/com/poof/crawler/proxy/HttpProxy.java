@@ -47,6 +47,10 @@ public class HttpProxy {
 	public HttpProxy(String address, int port) {
 		this(new Proxy(Proxy.Type.HTTP, new InetSocketAddress(address, port)), 0, 0, DEFAULT_REUSE_TIME_INTERVAL);
 	}
+	
+	public HttpProxy(Proxy.Type type, String address, int port) {
+		this(new Proxy(type, new InetSocketAddress(address, port)), 0, 0, DEFAULT_REUSE_TIME_INTERVAL);
+	}
 
 	public HttpProxy(Proxy proxy) {
 		this(proxy, 0, 0, DEFAULT_REUSE_TIME_INTERVAL);
@@ -180,8 +184,7 @@ public class HttpProxy {
 
 	@Override
 	public String toString() {
-		return this.proxy.toString() + ">>> 使用:" + borrowNum + "次 " + ">>> 连续失败:" + failedNum + "次" + ">>> 距离下次可用:"
-				+ TimeUnit.MILLISECONDS.convert(canReuseTime > System.nanoTime() ? canReuseTime - System.nanoTime() : 0, TimeUnit.NANOSECONDS) + " ms后";
+		return this.proxy.toString() + " 使用:" + borrowNum + "次 ";
 	}
 
 	public String getKey() {

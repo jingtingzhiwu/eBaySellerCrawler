@@ -23,8 +23,7 @@ import org.quartz.Trigger;
 import org.springframework.scheduling.quartz.MethodInvokingJobDetailFactoryBean;
 
 import com.poof.crawler.db.entity.Schedule;
-import com.poof.crawler.utils.pool.KeyWordPool;
-import com.poof.crawler.utils.pool.SellerIDPool;
+import com.poof.crawler.utils.pool.ListingPool;
 
 /**
  * @author wilkey
@@ -193,13 +192,13 @@ public class DynamicTask {
 					jobDetail.setName(list.get(i).getName() + list.get(i).getId());
 
 					if ("1".equals(list.get(i).getType())) {
-						jobDetail.setTargetObject(KeyWordPool.getInstance());
+						jobDetail.setTargetObject(ListingPool.getInstance());
 						jobDetail.setArguments(new Object[] { new PlaceEbayByKeyWordFetcher(list.get(i)) });
 					} else if ("2".equals(list.get(i).getType())) {
-						jobDetail.setTargetObject(SellerIDPool.getInstance());
+						jobDetail.setTargetObject(ListingPool.getInstance());
 						jobDetail.setArguments(new Object[] { new PlaceEbayBySellerIdFetcher(list.get(i)) });
 					} else if ("3".equals(list.get(i).getType())) {
-						jobDetail.setTargetObject(KeyWordPool.getInstance());
+						jobDetail.setTargetObject(ListingPool.getInstance());
 						jobDetail.setArguments(new Object[] { new PlaceEbayByItemIdFetcher(list.get(i)) });
 					}
 					jobDetail.afterPropertiesSet();
@@ -207,7 +206,7 @@ public class DynamicTask {
 					trigger = new CronTrigger(list.get(i).getName() + list.get(i).getId(), Scheduler.DEFAULT_GROUP, list.get(i).getCronexp());
 					scheduler.scheduleJob((JobDetail) jobDetail.getObject(), trigger);
 					this.startOrStop(trigger.getName(), start);
-					log.info("new schedule name: [" + (list.get(i).getName() + list.get(i).getId()) + "] runned...");
+					log.info("new schedule name: [" + (list.get(i).getName()) + "] runned...");
 				}
 			} else if (null != trigger) {
 				// Trigger已存在，那么更新相应的定时设置

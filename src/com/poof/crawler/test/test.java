@@ -5,9 +5,8 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.Timestamp;
 import java.text.SimpleDateFormat;
-import java.util.ArrayList;
-import java.util.List;
 import java.util.Locale;
+import java.util.Random;
 
 import com.poof.crawler.db.DBUtil;
 import com.poof.crawler.utils.pool.KeyWordListPool;
@@ -15,7 +14,6 @@ import com.poof.crawler.utils.pool.ThreadPoolMirror;
 
 public class test {
 	public static void main(String[] args) throws UnsupportedEncodingException, InterruptedException {
-		
 
 		for (int i = 0; i < 50; i++) {
 			final int c = i;

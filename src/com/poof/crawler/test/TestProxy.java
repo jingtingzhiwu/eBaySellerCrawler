@@ -2,24 +2,40 @@ package com.poof.crawler.test;
 
 import java.io.BufferedInputStream;
 import java.io.IOException;
+import java.net.InetSocketAddress;
+import java.net.Proxy;
+import java.net.Proxy.Type;
 import java.net.URL;
 import java.net.URLConnection;
 import java.text.ParseException;
+import java.util.Base64;
 
 import org.apache.log4j.Logger;
+import org.jsoup.Jsoup;
+import org.jsoup.nodes.Document;
 
 public class TestProxy {
 	private static Logger log = Logger.getLogger(TestProxy.class);
 
 	public static void main(String[] args) throws IOException, ParseException {
-
+		System.err.println("55.2".matches(".*\\d+\\.?\\d.*"));
+		if(1==1)return;
+		InetSocketAddress address = new InetSocketAddress("198.46.206.196", 14807);
+		Proxy proxy = new Proxy(Type.HTTP,address);
+		Document doc = Jsoup.connect("http://www.ip138.com/ip2city.asp").proxy(proxy)
+				.timeout(60 * 1000)
+				.header("Proxy-Authorization", "Basic " + Base64.getEncoder().encodeToString(("17707605:6EBeTY4YM").getBytes()))
+				.execute()
+				.parse();
+		System.err.println(doc.html());
+		if(1==1)return;
 		System.setProperty("http.maxRedirects", "50");
 		System.getProperties().setProperty("proxySet", "true");
-		System.getProperties().setProperty("http.proxyHost", "115.231.105.109");
-		System.getProperties().setProperty("http.proxyPort", "8081");
+		System.getProperties().setProperty("http.proxyHost", "23.238.225.170");
+		System.getProperties().setProperty("http.proxyPort", "65022");
 
 		// 确定代理是否设置成功
-		System.err.println(getHtml("http://www.163.com"));
+		System.err.println(getHtml("http://www.ip138.com/ip2city.asp"));
 
 	}
 

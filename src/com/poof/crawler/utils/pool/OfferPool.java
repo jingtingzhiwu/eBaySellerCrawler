@@ -28,7 +28,7 @@ public class OfferPool {
 	public static ThreadPoolExecutor getInstance() {
 		if (executor == null) {
 			BlockingQueue<Runnable> queue = new LinkedBlockingQueue<Runnable>();
-			executor = new ThreadPoolExecutor(20, 40, 10, TimeUnit.SECONDS, queue);
+			executor = new ThreadPoolExecutor(30, 30, Long.MAX_VALUE, TimeUnit.SECONDS, queue);
 		}
 
 		return executor;

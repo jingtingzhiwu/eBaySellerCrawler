@@ -25,10 +25,10 @@ public class PlaceEbayByKeyWordFetcher  extends PlaceEbayFetcher implements Runn
 	@Override
 	public void run() {
 
-		log.info("starting [PlaceEbayByKeyWord] thread name: [" + schedule.getName() + "], site: [" + schedule.getSite() + "], searchterm: [" + schedule.getSearchTerm() + "]");
+		log.info("starting [PlaceEbayByKeyWord] , searchterm: [" + schedule.getSearchTerm() + "]");
 
 		try {
-			KeyWordListPool.getInstance().execute(new ListingParser(schedule, String.format(PRE_URL, schedule.getSite(), URLEncoder.encode(String.format(ITEMID_LIST_URL, schedule.getSite(), schedule.getSearchTerm(), 1, 0), "UTF-8")) + END_URL, getUSProxyHost()));
+			KeyWordListPool.getInstance().execute(new ListingParser(schedule, String.format(PRE_URL, schedule.getSite(), URLEncoder.encode(String.format(ITEMID_LIST_URL, schedule.getSite(), schedule.getSearchTerm(), 1, 0), "UTF-8")) + END_URL));
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
